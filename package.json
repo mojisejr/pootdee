@@ -2,32 +2,43 @@
   "name": "pootdee",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.18.0 <21.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:env": "tsx scripts/check-env.ts",
+    "check:types": "tsc --noEmit",
+    "check:lint": "next lint",
+    "check:build": "next build",
+    "check:all": "npm run check:env && npm run check:types && npm run check:lint && npm run check:build"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.32.0",
-    "@sanity/image-url": "^1.2.0",
-    "@sanity/vision": "^4.9.0",
-    "lucide-react": "^0.544.0",
+    "@clerk/nextjs": "6.32.0",
+    "@sanity/image-url": "1.2.0",
+    "@sanity/vision": "4.9.0",
+    "lucide-react": "0.544.0",
     "next": "14.2.30",
-    "next-sanity": "^11.1.1",
-    "react": "^18",
-    "react-dom": "^18",
-    "sanity": "^4.9.0",
-    "styled-components": "^6.1.19"
+    "next-sanity": "11.1.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "sanity": "4.9.0",
+    "styled-components": "6.1.19"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "eslint": "^8",
+    "@types/node": "20.19.17",
+    "@types/react": "18.3.24",
+    "@types/react-dom": "18.3.7",
+    "dotenv": "16.4.7",
+    "eslint": "8.57.1",
     "eslint-config-next": "14.2.30",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "postcss": "8.5.6",
+    "tailwindcss": "3.4.17",
+    "tsx": "4.19.2",
+    "typescript": "5.9.2"
   }
 }
