@@ -13,9 +13,10 @@ const config: Config = {
         // Base colors
         background: "var(--background)",
         foreground: "var(--foreground)",
-        
+
         // Primary color palette - Orange
         primary: {
+          DEFAULT: "var(--primary-500)", // Default primary color for bg-primary
           50: "var(--primary-50)",
           100: "var(--primary-100)",
           200: "var(--primary-200)",
@@ -28,9 +29,10 @@ const config: Config = {
           900: "var(--primary-900)",
           950: "var(--primary-950)",
         },
-        
+
         // Secondary color palette - Navy Blue
         secondary: {
+          DEFAULT: "var(--secondary-500)", // Default secondary color for bg-secondary
           50: "var(--secondary-50)",
           100: "var(--secondary-100)",
           200: "var(--secondary-200)",
@@ -43,9 +45,10 @@ const config: Config = {
           900: "var(--secondary-900)",
           950: "var(--secondary-950)",
         },
-        
+
         // Accent color palette - Green
         accent: {
+          DEFAULT: "var(--accent-500)", // Default accent color for bg-accent
           50: "var(--accent-50)",
           100: "var(--accent-100)",
           200: "var(--accent-200)",
@@ -58,7 +61,7 @@ const config: Config = {
           900: "var(--accent-900)",
           950: "var(--accent-950)",
         },
-        
+
         // Neutral gray scale
         neutral: {
           50: "var(--neutral-50)",
@@ -73,13 +76,13 @@ const config: Config = {
           900: "var(--neutral-900)",
           950: "var(--neutral-950)",
         },
-        
+
         // Semantic colors
         success: "var(--success)",
         warning: "var(--warning)",
         error: "var(--error)",
         info: "var(--info)",
-        
+
         // Component-specific colors
         border: "var(--border)",
         input: "var(--input)",
@@ -97,25 +100,25 @@ const config: Config = {
           foreground: "var(--popover-foreground)",
         },
       },
-      
+
       // Typography system with Inter font
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
       },
-      
+
       // Design tokens for spacing and sizing
       spacing: {
         18: "4.5rem",
         88: "22rem",
       },
-      
+
       // Border radius tokens
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
-      
+
       // Animation and transitions
       keyframes: {
         "fade-in": {
