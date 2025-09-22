@@ -1,18 +1,18 @@
-import { analyzerAgent } from './analyzer';
-import { 
-  WorkflowState, 
-  AnalysisResult, 
+import { analyzerAgent } from "./analyzer";
+import {
+  WorkflowState,
+  AnalysisResult,
   AnalysisMetadata,
   SentenceFilterInput,
   SentenceFilterOutput,
   AnalyzerInput,
   AnalyzerOutput,
-  createAnalysisMetadata
-} from '../../interfaces/langchain';
-import { createLogger } from '../../lib/logger';
+  createAnalysisMetadata,
+} from "../../interfaces/langchain";
+import { createLogger } from "../../lib/logger";
 
 // Create scoped logger for workflow
-const logger = createLogger('EnglishAnalysisWorkflow');
+const logger = createLogger("EnglishAnalysisWorkflow");
 
 // Enhanced workflow interfaces
 export interface WorkflowConfig {
@@ -74,9 +74,9 @@ export class EnglishAnalysisWorkflow {
   private static instance: EnglishAnalysisWorkflow;
 
   private constructor() {
-    logger.info('Workflow initialized', {
-      component: 'EnglishAnalysisWorkflow',
-      action: 'constructor'
+    logger.info("Workflow initialized", {
+      component: "EnglishAnalysisWorkflow",
+      action: "constructor",
     });
   }
 
@@ -95,17 +95,17 @@ export class EnglishAnalysisWorkflow {
   ): Promise<AnalyzerOutput> {
     const startTime = Date.now();
     const sessionId = `workflow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    logger.info('Starting workflow execution', {
-      component: 'EnglishAnalysisWorkflow',
-      action: 'execute',
+
+    logger.info("Starting workflow execution", {
+      component: "EnglishAnalysisWorkflow",
+      action: "execute",
       metadata: {
         sessionId,
         englishPhraseLength: englishPhrase.length,
         userTranslationLength: userTranslation.length,
         hasContext: !!context,
-        userId
-      }
+        userId,
+      },
     });
 
     // Initialize enhanced workflow state
@@ -114,123 +114,123 @@ export class EnglishAnalysisWorkflow {
       userTranslation,
       context,
       isValidSentence: false,
-      currentStep: 'filter',
+      currentStep: "filter",
       sessionId,
       startTime,
       metadata: {
         timestamp: new Date().toISOString(),
         processingTimeMs: 0,
-        modelUsed: 'google-gemini',
+        modelUsed: "google-gemini",
         confidence: 0,
         retryCount: 0,
-        version: '2.0.0',
+        version: "2.0.0",
         sessionId,
-        workflowVersion: '2.0.0',
-        processingSteps: []
-      }
+        workflowVersion: "2.0.0",
+        processingSteps: [],
+      },
     };
 
     try {
       // Step 1: Sentence filtering
-      state.currentStep = 'filter';
-      logger.debug('Starting sentence filtering', {
-        component: 'EnglishAnalysisWorkflow',
-        action: 'sentence_filtering',
-        metadata: { sessionId }
+      state.currentStep = "filter";
+      logger.debug("Starting sentence filtering", {
+        component: "EnglishAnalysisWorkflow",
+        action: "sentence_filtering",
+        metadata: { sessionId },
       });
 
       const filterResult = await this.sentenceFilterNode(state);
       state.metadata!.processingSteps.push({
-        step: 'sentence_filtering',
+        step: "sentence_filtering",
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        success: filterResult.isValidSentence
+        success: filterResult.isValidSentence,
       });
 
       if (!filterResult.isValidSentence) {
-        logger.error('Sentence filtering failed', undefined, {
-          component: 'EnglishAnalysisWorkflow',
-          action: 'sentence_filtering',
+        logger.error("Sentence filtering failed", undefined, {
+          component: "EnglishAnalysisWorkflow",
+          action: "sentence_filtering",
           metadata: {
             sessionId,
-            reason: filterResult.filterError
-          }
+            reason: filterResult.filterError,
+          },
         });
 
         // Return error result with basic structure
         return {
-          correctness: 'incorrect',
-          meaning: 'Invalid input detected',
+          correctness: "incorrect",
+          meaning: "Invalid input detected",
           alternatives: [],
-          errors: filterResult.filterError || 'Invalid input',
+          errors: filterResult.filterError || "Invalid input",
           grammarAnalysis: {
             score: 0,
             issues: [],
             strengths: [],
-            recommendations: []
+            recommendations: [],
           },
           vocabularyAnalysis: {
             score: 0,
-            level: 'beginner',
+            level: "beginner",
             appropriateWords: [],
             inappropriateWords: [],
-            suggestions: []
+            suggestions: [],
           },
           contextAnalysis: {
             score: 0,
-            appropriateness: 'neutral',
+            appropriateness: "neutral",
             culturalNotes: [],
             usageNotes: [],
-            situationalFit: 'Not applicable due to invalid input'
+            situationalFit: "Not applicable due to invalid input",
           },
           confidence: 0,
-          suggestions: ['Please provide a valid English phrase']
+          suggestions: ["Please provide a valid English phrase"],
         };
       }
 
       // Step 2: Analysis
-      state.currentStep = 'analyze';
-      logger.debug('Starting analysis', {
-        component: 'EnglishAnalysisWorkflow',
-        action: 'analysis',
-        metadata: { sessionId }
+      state.currentStep = "analyze";
+      logger.debug("Starting analysis", {
+        component: "EnglishAnalysisWorkflow",
+        action: "analysis",
+        metadata: { sessionId },
       });
 
       const analysisResult = await this.analyzerNode(filterResult);
       state.metadata!.processingSteps.push({
-        step: 'analysis',
+        step: "analysis",
         timestamp: new Date().toISOString(),
         duration: Date.now() - startTime,
-        success: !!analysisResult.analysisResult
+        success: !!analysisResult.analysisResult,
       });
 
       if (!analysisResult.analysisResult) {
-        logger.error('Analysis failed', undefined, {
-          component: 'EnglishAnalysisWorkflow',
-          action: 'analysis',
+        logger.error("Analysis failed", undefined, {
+          component: "EnglishAnalysisWorkflow",
+          action: "analysis",
           metadata: {
             sessionId,
-            error: analysisResult.analysisError
-          }
+            error: analysisResult.analysisError,
+          },
         });
 
-        throw new Error(analysisResult.analysisError || 'Analysis failed');
+        throw new Error(analysisResult.analysisError || "Analysis failed");
       }
 
       // Step 3: Finalization
-      state.currentStep = 'complete';
+      state.currentStep = "complete";
       const totalProcessingTime = Date.now() - startTime;
-      
-      logger.info('Workflow execution completed', {
-        component: 'EnglishAnalysisWorkflow',
-        action: 'execute_complete',
+
+      logger.info("Workflow execution completed", {
+        component: "EnglishAnalysisWorkflow",
+        action: "execute_complete",
         metadata: {
           sessionId,
           totalProcessingTime,
           correctness: analysisResult.analysisResult.correctness,
           confidence: analysisResult.analysisResult.confidence,
-          stepsCompleted: state.metadata!.processingSteps.length
-        }
+          stepsCompleted: state.metadata!.processingSteps.length,
+        },
       });
 
       // Update metadata
@@ -238,26 +238,30 @@ export class EnglishAnalysisWorkflow {
       state.metadata!.confidence = analysisResult.analysisResult.confidence;
 
       return analysisResult.analysisResult;
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
       const totalProcessingTime = Date.now() - startTime;
 
-      logger.error('Workflow execution failed', error instanceof Error ? error : undefined, {
-        component: 'EnglishAnalysisWorkflow',
-        action: 'execute_error',
-        metadata: {
-          sessionId,
-          error: errorMessage,
-          currentStep: state.currentStep,
-          totalProcessingTime,
-          processingSteps: state.metadata!.processingSteps
+      logger.error(
+        "Workflow execution failed",
+        error instanceof Error ? error : undefined,
+        {
+          component: "EnglishAnalysisWorkflow",
+          action: "execute_error",
+          metadata: {
+            sessionId,
+            error: errorMessage,
+            currentStep: state.currentStep,
+            totalProcessingTime,
+            processingSteps: state.metadata!.processingSteps,
+          },
         }
-      });
+      );
 
       // Return error result
       return {
-        correctness: 'incorrect',
+        correctness: "incorrect",
         meaning: `Analysis failed: ${errorMessage}`,
         alternatives: [],
         errors: errorMessage,
@@ -265,39 +269,41 @@ export class EnglishAnalysisWorkflow {
           score: 0,
           issues: [],
           strengths: [],
-          recommendations: []
+          recommendations: [],
         },
         vocabularyAnalysis: {
           score: 0,
-          level: 'beginner',
+          level: "beginner",
           appropriateWords: [],
           inappropriateWords: [],
-          suggestions: []
+          suggestions: [],
         },
         contextAnalysis: {
           score: 0,
-          appropriateness: 'neutral',
+          appropriateness: "neutral",
           culturalNotes: [],
           usageNotes: [],
-          situationalFit: 'Not applicable due to error'
+          situationalFit: "Not applicable due to error",
         },
         confidence: 0,
-        suggestions: ['Please try again with a different input']
+        suggestions: ["Please try again with a different input"],
       };
     }
   }
 
-  private async sentenceFilterNode(state: EnhancedWorkflowState): Promise<EnhancedWorkflowState> {
+  private async sentenceFilterNode(
+    state: EnhancedWorkflowState
+  ): Promise<EnhancedWorkflowState> {
     const { englishPhrase, userTranslation } = state;
 
-    logger.debug('Performing sentence filtering', {
-      component: 'EnglishAnalysisWorkflow',
-      action: 'sentenceFilterNode',
+    logger.debug("Performing sentence filtering", {
+      component: "EnglishAnalysisWorkflow",
+      action: "sentenceFilterNode",
       metadata: {
         sessionId: state.sessionId,
         englishPhraseLength: englishPhrase.length,
-        userTranslationLength: userTranslation?.length || 0
-      }
+        userTranslationLength: userTranslation?.length || 0,
+      },
     });
 
     // Basic validation
@@ -305,8 +311,8 @@ export class EnglishAnalysisWorkflow {
       return {
         ...state,
         isValidSentence: false,
-        filterError: 'English phrase cannot be empty',
-        currentStep: 'error'
+        filterError: "English phrase cannot be empty",
+        currentStep: "error",
       };
     }
 
@@ -314,8 +320,8 @@ export class EnglishAnalysisWorkflow {
       return {
         ...state,
         isValidSentence: false,
-        filterError: 'User translation cannot be empty',
-        currentStep: 'error'
+        filterError: "User translation cannot be empty",
+        currentStep: "error",
       };
     }
 
@@ -324,8 +330,8 @@ export class EnglishAnalysisWorkflow {
       return {
         ...state,
         isValidSentence: false,
-        filterError: 'English phrase is too long (maximum 500 characters)',
-        currentStep: 'error'
+        filterError: "English phrase is too long (maximum 500 characters)",
+        currentStep: "error",
       };
     }
 
@@ -333,8 +339,8 @@ export class EnglishAnalysisWorkflow {
       return {
         ...state,
         isValidSentence: false,
-        filterError: 'Translation is too long (maximum 500 characters)',
-        currentStep: 'error'
+        filterError: "Translation is too long (maximum 500 characters)",
+        currentStep: "error",
       };
     }
 
@@ -344,167 +350,179 @@ export class EnglishAnalysisWorkflow {
       return {
         ...state,
         isValidSentence: false,
-        filterError: 'English phrase contains invalid characters',
-        currentStep: 'error'
+        filterError: "English phrase contains invalid characters",
+        currentStep: "error",
       };
     }
 
-    logger.debug('Sentence filtering passed', {
-      component: 'EnglishAnalysisWorkflow',
-      action: 'sentenceFilterNode',
+    logger.debug("Sentence filtering passed", {
+      component: "EnglishAnalysisWorkflow",
+      action: "sentenceFilterNode",
       metadata: {
         sessionId: state.sessionId,
-        result: 'valid'
-      }
+        result: "valid",
+      },
     });
 
     return {
       ...state,
       isValidSentence: true,
-      currentStep: 'analyze'
+      currentStep: "analyze",
     };
   }
 
-  private async analyzerNode(state: EnhancedWorkflowState): Promise<EnhancedWorkflowState> {
+  private async analyzerNode(
+    state: EnhancedWorkflowState
+  ): Promise<EnhancedWorkflowState> {
     const { englishPhrase, userTranslation, context } = state;
 
-    logger.debug('Performing analysis', {
-      component: 'EnglishAnalysisWorkflow',
-      action: 'analyzerNode',
+    logger.debug("Performing analysis", {
+      component: "EnglishAnalysisWorkflow",
+      action: "analyzerNode",
       metadata: {
         sessionId: state.sessionId,
-        hasContext: !!context
-      }
+        hasContext: !!context,
+      },
     });
 
     try {
       const analyzerInput: AnalyzerInput = {
         sentence: englishPhrase,
         userTranslation,
-        context
+        context,
       };
 
       const result = await analyzerAgent.analyzeSentence(analyzerInput);
 
-      logger.debug('Analysis completed successfully', {
-        component: 'EnglishAnalysisWorkflow',
-        action: 'analyzerNode',
+      logger.debug("Analysis completed successfully", {
+        component: "EnglishAnalysisWorkflow",
+        action: "analyzerNode",
         metadata: {
           sessionId: state.sessionId,
           correctness: result.correctness,
-          confidence: result.confidence
-        }
+          confidence: result.confidence,
+        },
       });
 
       return {
         ...state,
         analysisResult: result,
-        currentStep: 'complete'
+        currentStep: "complete",
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Analysis failed';
-      
-      logger.error('Analysis node failed', error instanceof Error ? error : undefined, {
-        component: 'EnglishAnalysisWorkflow',
-        action: 'analyzerNode',
-        metadata: {
-          sessionId: state.sessionId,
-          error: errorMessage
+      const errorMessage =
+        error instanceof Error ? error.message : "Analysis failed";
+
+      logger.error(
+        "Analysis node failed",
+        error instanceof Error ? error : undefined,
+        {
+          component: "EnglishAnalysisWorkflow",
+          action: "analyzerNode",
+          metadata: {
+            sessionId: state.sessionId,
+            error: errorMessage,
+          },
         }
-      });
+      );
 
       return {
         ...state,
         analysisError: errorMessage,
-        currentStep: 'error'
+        currentStep: "error",
       };
     }
   }
 
   public async healthCheck(): Promise<WorkflowHealthStatus> {
-    logger.debug('Performing health check', {
-      component: 'EnglishAnalysisWorkflow',
-      action: 'healthCheck'
+    logger.debug("Performing health check", {
+      component: "EnglishAnalysisWorkflow",
+      action: "healthCheck",
     });
 
     try {
       // Test analyzer with a simple check
-      const analyzerTest = await analyzerAgent.quickCheck('Hello world');
+      const analyzerTest = await analyzerAgent.quickCheck("Hello world");
       const analyzerHealthy = analyzerTest !== undefined;
-      
+
       const status: WorkflowHealthStatus = {
         isHealthy: analyzerHealthy,
-        status: analyzerHealthy ? 'healthy' : 'unhealthy',
+        status: analyzerHealthy ? "healthy" : "unhealthy",
         details: {
           components: {
             analyzer: {
               isHealthy: analyzerHealthy,
               lastCheck: new Date().toISOString(),
-              version: '2.0.0'
+              version: "2.0.0",
             },
             workflow: {
               isHealthy: true,
               lastCheck: new Date().toISOString(),
-              version: '2.0.0'
-            }
+              version: "2.0.0",
+            },
           },
           lastCheck: new Date().toISOString(),
-          version: '2.0.0'
-        }
+          version: "2.0.0",
+        },
       };
 
-      logger.info('Health check completed', {
-        component: 'EnglishAnalysisWorkflow',
-        action: 'healthCheck',
+      logger.info("Health check completed", {
+        component: "EnglishAnalysisWorkflow",
+        action: "healthCheck",
         metadata: {
           isHealthy: status.isHealthy,
-          version: status.details.version
-        }
+          version: status.details.version,
+        },
       });
 
       return status;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Health check failed';
-      
-      logger.error('Health check failed', error instanceof Error ? error : undefined, {
-        component: 'EnglishAnalysisWorkflow',
-        action: 'healthCheck',
-        metadata: { error: errorMessage }
-      });
+      const errorMessage =
+        error instanceof Error ? error.message : "Health check failed";
+
+      logger.error(
+        "Health check failed",
+        error instanceof Error ? error : undefined,
+        {
+          component: "EnglishAnalysisWorkflow",
+          action: "healthCheck",
+          metadata: { error: errorMessage },
+        }
+      );
 
       return {
         isHealthy: false,
-        status: 'unhealthy',
+        status: "unhealthy",
         details: {
           components: {
             analyzer: {
               isHealthy: false,
               lastCheck: new Date().toISOString(),
-              error: errorMessage
+              error: errorMessage,
             },
             workflow: {
               isHealthy: false,
               lastCheck: new Date().toISOString(),
-              version: '2.0.0',
-              error: errorMessage
-            }
+              version: "2.0.0",
+              error: errorMessage,
+            },
           },
           lastCheck: new Date().toISOString(),
-          version: '2.0.0',
-          error: errorMessage
-        }
+          version: "2.0.0",
+          error: errorMessage,
+        },
       };
     }
   }
 
   public getConfig(): WorkflowConfig {
-    logger.debug('Getting workflow configuration', {
-      component: 'EnglishAnalysisWorkflow',
-      action: 'getConfig'
+    logger.debug("Getting workflow configuration", {
+      component: "EnglishAnalysisWorkflow",
+      action: "getConfig",
     });
 
     return {
-      version: '2.0.0',
+      version: "2.0.0",
       maxInputLength: 500,
       timeoutMs: 30000,
       retryAttempts: 3,
@@ -516,8 +534,8 @@ export class EnglishAnalysisWorkflow {
         vocabularyAnalysis: true,
         contextAnalysis: true,
         batchProcessing: true,
-        healthChecking: true
-      }
+        healthChecking: true,
+      },
     };
   }
 }

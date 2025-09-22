@@ -1,13 +1,13 @@
 /**
  * Centralized Logging Utility for pootdee Application
- * 
+ *
  * Provides structured logging with three levels:
  * - INFO: General information messages (production + development)
- * - ERROR: Error messages (production + development)  
+ * - ERROR: Error messages (production + development)
  * - DEBUG: Debug messages (development only)
  */
 
-export type LogLevel = 'INFO' | 'ERROR' | 'DEBUG';
+export type LogLevel = "INFO" | "ERROR" | "DEBUG";
 
 export interface LogContext {
   userId?: string;
@@ -29,7 +29,7 @@ class Logger {
   private isDevelopment: boolean;
 
   constructor() {
-    this.isDevelopment = process.env.NODE_ENV === 'development';
+    this.isDevelopment = process.env.NODE_ENV === "development";
   }
 
   /**
@@ -44,27 +44,27 @@ class Logger {
    */
   private formatLogEntry(entry: LogEntry): string {
     const { level, message, timestamp, context, error } = entry;
-    
+
     let formattedMessage = `[${timestamp}] ${level}: ${message}`;
-    
+
     if (context) {
       const contextStr = Object.entries(context)
         .filter(([_, value]) => value !== undefined)
         .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
-        .join(' ');
-      
+        .join(" ");
+
       if (contextStr) {
         formattedMessage += ` | ${contextStr}`;
       }
     }
-    
+
     if (error) {
       formattedMessage += ` | Error: ${error.message}`;
       if (this.isDevelopment && error.stack) {
         formattedMessage += `\nStack: ${error.stack}`;
       }
     }
-    
+
     return formattedMessage;
   }
 
@@ -73,10 +73,10 @@ class Logger {
    */
   info(message: string, context?: LogContext): void {
     const entry: LogEntry = {
-      level: 'INFO',
+      level: "INFO",
       message,
       timestamp: this.getTimestamp(),
-      context
+      context,
     };
 
     console.log(this.formatLogEntry(entry));
@@ -87,11 +87,11 @@ class Logger {
    */
   error(message: string, error?: Error, context?: LogContext): void {
     const entry: LogEntry = {
-      level: 'ERROR',
+      level: "ERROR",
       message,
       timestamp: this.getTimestamp(),
       context,
-      error
+      error,
     };
 
     console.error(this.formatLogEntry(entry));
@@ -106,10 +106,10 @@ class Logger {
     }
 
     const entry: LogEntry = {
-      level: 'DEBUG',
+      level: "DEBUG",
       message,
       timestamp: this.getTimestamp(),
-      context
+      context,
     };
 
     console.debug(this.formatLogEntry(entry));
@@ -157,7 +157,11 @@ export const logInfo = (message: string, context?: LogContext): void => {
   logger.info(message, context);
 };
 
-export const logError = (message: string, error?: Error, context?: LogContext): void => {
+export const logError = (
+  message: string,
+  error?: Error,
+  context?: LogContext
+): void => {
   logger.error(message, error, context);
 };
 
@@ -166,9 +170,12 @@ export const logDebug = (message: string, context?: LogContext): void => {
 };
 
 // Export scoped logger creator
-export const createLogger = (component: string, additionalContext?: Omit<LogContext, 'component'>): ScopedLogger => {
+export const createLogger = (
+  component: string,
+  additionalContext?: Omit<LogContext, "component">
+): ScopedLogger => {
   return logger.createScopedLogger({
     component,
-    ...additionalContext
+    ...additionalContext,
   });
 };
