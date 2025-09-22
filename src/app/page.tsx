@@ -7,7 +7,7 @@ import { useSavePhrase } from "./hooks/useSavePhrase";
 import { 
   AnalyzeRequest, 
   AnalyzeResponse, 
-  AnalysisResult,
+  AnalyzerOutput,
   ERROR_MESSAGES, 
   ErrorType 
 } from "@/interfaces/langchain";
@@ -26,7 +26,7 @@ export default function Home() {
   });
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalyzerOutput | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -103,11 +103,38 @@ export default function Home() {
             const suggestion = suggestionMatch ? suggestionMatch[1] : null;
             
             // Create a special analysis result for grammar corrections
-            const correctionResult: AnalysisResult = {
+            const correctionResult: AnalyzerOutput = {
               correctness: "incorrect" as const,
               meaning: "ประโยคนี้มีไวยากรณ์ที่ไม่ถูกต้อง",
               alternatives: suggestion ? [suggestion] : [],
-              errors: data.error.message
+              errors: data.error.message,
+              grammarAnalysis: {
+                score: 0,
+                issues: [{
+                  type: "other",
+                  description: data.error.message,
+                  severity: "high",
+                  suggestion: suggestion || "กรุณาตรวจสอบไวยากรณ์"
+                }],
+                strengths: [],
+                recommendations: suggestion ? [`ใช้ "${suggestion}" แทน`] : []
+              },
+              vocabularyAnalysis: {
+                score: 50,
+                level: "beginner",
+                appropriateWords: [],
+                inappropriateWords: [],
+                suggestions: []
+              },
+              contextAnalysis: {
+                score: 50,
+                appropriateness: "neutral",
+                culturalNotes: [],
+                usageNotes: [],
+                situationalFit: "ต้องแก้ไขไวยากรณ์ก่อน"
+              },
+              confidence: 0.9,
+              suggestions: suggestion ? [`ใช้ "${suggestion}" แทน`] : []
             };
             
             setAnalysisResult(correctionResult);
@@ -138,7 +165,7 @@ export default function Home() {
         throw new Error(errorMessage);
       }
 
-      if (!data.data) {
+      if (!data.success || !data.data) {
         throw new Error(ERROR_MESSAGES[ErrorType.API_ERROR].description);
       }
 
@@ -171,8 +198,6 @@ export default function Home() {
     setValidationError(null);
     debouncedAnalyze();
   }, [formData.englishPhrase, debouncedAnalyze]);
-
-
 
   const handleSave = async (): Promise<void> => {
     const success = await savePhrase(formData);
@@ -290,8 +315,6 @@ export default function Home() {
                   />
                 </div>
 
-
-
                 <button
                   onClick={() => setIsExpanded(false)}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -351,12 +374,15 @@ export default function Home() {
               </div>
             )}
 
-            {/* Analysis Result Display */}
+            {/* Enhanced Analysis Result Display */}
             {analysisResult && (
               <div className="p-6 bg-green-50 border border-green-200 rounded-xl space-y-4">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">✅</span>
                   <h3 className="text-lg font-semibold text-green-800">ผลการวิเคราะห์</h3>
+                  <span className="ml-auto text-sm text-green-600">
+                    ความมั่นใจ: {Math.round(analysisResult.confidence * 100)}%
+                  </span>
                 </div>
                 
                 {/* Correctness Status */}
@@ -390,6 +416,129 @@ export default function Home() {
                   <p className="text-gray-700">{analysisResult.meaning}</p>
                 </div>
 
+                {/* Grammar Analysis */}
+                <div className="p-4 bg-white rounded-lg border border-green-100">
+                  <h4 className="font-medium text-green-700 mb-2">
+                    การวิเคราะห์ไวยากรณ์ (คะแนน: {analysisResult.grammarAnalysis.score}/100)
+                  </h4>
+                  
+                  {analysisResult.grammarAnalysis.issues.length > 0 && (
+                    <div className="mb-3">
+                      <h5 className="text-sm font-medium text-red-600 mb-1">ปัญหาที่พบ:</h5>
+                      <ul className="space-y-1">
+                        {analysisResult.grammarAnalysis.issues.map((issue, index) => (
+                          <li key={index} className="text-sm text-red-600 flex items-start gap-2">
+                            <span className="text-red-500 mt-1">•</span>
+                            <div>
+                              <span className="font-medium">{issue.description}</span>
+                              {issue.suggestion && (
+                                <div className="text-green-600 text-xs mt-1">
+                                  💡 {issue.suggestion}
+                                </div>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {analysisResult.grammarAnalysis.strengths.length > 0 && (
+                    <div className="mb-3">
+                      <h5 className="text-sm font-medium text-green-600 mb-1">จุดแข็ง:</h5>
+                      <ul className="space-y-1">
+                        {analysisResult.grammarAnalysis.strengths.map((strength, index) => (
+                          <li key={index} className="text-sm text-green-600 flex items-start gap-2">
+                            <span className="text-green-500 mt-1">✓</span>
+                            <span>{strength}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {analysisResult.grammarAnalysis.recommendations.length > 0 && (
+                    <div>
+                      <h5 className="text-sm font-medium text-blue-600 mb-1">ำแนะนำ:</h5>
+                      <ul className="space-y-1">
+                        {analysisResult.grammarAnalysis.recommendations.map((rec, index) => (
+                          <li key={index} className="text-sm text-blue-600 flex items-start gap-2">
+                            <span className="text-blue-500 mt-1">💡</span>
+                            <span>{rec}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Vocabulary Analysis */}
+                <div className="p-4 bg-white rounded-lg border border-green-100">
+                  <h4 className="font-medium text-green-700 mb-2">
+                    การวิเคราะห์คำศัพท์ (คะแนน: {analysisResult.vocabularyAnalysis.score}/100)
+                  </h4>
+                  <p className="text-sm text-gray-600 mb-2">
+                    ระดับ: <span className="font-medium">{analysisResult.vocabularyAnalysis.level}</span>
+                  </p>
+
+                  {analysisResult.vocabularyAnalysis.suggestions.length > 0 && (
+                    <div>
+                      <h5 className="text-sm font-medium text-blue-600 mb-1">คำแนะนำคำศัพท์:</h5>
+                      <ul className="space-y-1">
+                        {analysisResult.vocabularyAnalysis.suggestions.map((suggestion, index) => (
+                          <li key={index} className="text-sm text-blue-600 flex items-start gap-2">
+                            <span className="text-blue-500 mt-1">💡</span>
+                            <div>
+                              <span className="font-medium">{suggestion.original}</span> → 
+                              <span className="font-medium text-green-600"> {suggestion.suggested}</span>
+                              <div className="text-xs text-gray-600 mt-1">{suggestion.reason}</div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Context Analysis */}
+                <div className="p-4 bg-white rounded-lg border border-green-100">
+                  <h4 className="font-medium text-green-700 mb-2">
+                    การวิเคราะห์บริบท (คะแนน: {analysisResult.contextAnalysis.score}/100)
+                  </h4>
+                  <p className="text-sm text-gray-600 mb-2">
+                    ความเหมาะสม: <span className="font-medium">{analysisResult.contextAnalysis.appropriateness}</span>
+                  </p>
+                  <p className="text-sm text-gray-700 mb-2">{analysisResult.contextAnalysis.situationalFit}</p>
+
+                  {analysisResult.contextAnalysis.usageNotes.length > 0 && (
+                    <div className="mb-2">
+                      <h5 className="text-sm font-medium text-blue-600 mb-1">หมายเหตุการใช้:</h5>
+                      <ul className="space-y-1">
+                        {analysisResult.contextAnalysis.usageNotes.map((note, index) => (
+                          <li key={index} className="text-sm text-blue-600 flex items-start gap-2">
+                            <span className="text-blue-500 mt-1">📝</span>
+                            <span>{note}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {analysisResult.contextAnalysis.culturalNotes.length > 0 && (
+                    <div>
+                      <h5 className="text-sm font-medium text-purple-600 mb-1">หมายเหตุทางวัฒนธรรม:</h5>
+                      <ul className="space-y-1">
+                        {analysisResult.contextAnalysis.culturalNotes.map((note, index) => (
+                          <li key={index} className="text-sm text-purple-600 flex items-start gap-2">
+                            <span className="text-purple-500 mt-1">🌍</span>
+                            <span>{note}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
                 {/* Alternatives */}
                 {analysisResult.alternatives && analysisResult.alternatives.length > 0 && (
                   <div className="p-4 bg-white rounded-lg border border-green-100">
@@ -405,10 +554,25 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Errors/Suggestions */}
+                {/* General Suggestions */}
+                {analysisResult.suggestions && analysisResult.suggestions.length > 0 && (
+                  <div className="p-4 bg-white rounded-lg border border-green-100">
+                    <h4 className="font-medium text-green-700 mb-2">คำแนะนำทั่วไป:</h4>
+                    <ul className="space-y-1">
+                      {analysisResult.suggestions.map((suggestion, index) => (
+                        <li key={index} className="text-gray-700 flex items-start gap-2">
+                          <span className="text-blue-600 mt-1">💡</span>
+                          <span>{suggestion}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Errors/Additional Info */}
                 {analysisResult.errors && (
                   <div className="p-4 bg-white rounded-lg border border-green-100">
-                    <h4 className="font-medium text-green-700 mb-2">ข้อเสนอแนะ:</h4>
+                    <h4 className="font-medium text-green-700 mb-2">ข้อมูลเพิ่มเติม:</h4>
                     <p className="text-gray-700">{analysisResult.errors}</p>
                   </div>
                 )}

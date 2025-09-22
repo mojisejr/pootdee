@@ -9,8 +9,6 @@ export class LangGraphErrorHandler {
    * Handle errors from the Sentence Filter Agent
    */
   static handleFilterError(error: unknown): ErrorDetails {
-    console.error('ERROR: Filter Agent failed:', error);
-    
     if (error instanceof Error) {
       // API timeout errors
       if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
@@ -21,6 +19,7 @@ export class LangGraphErrorHandler {
           userMessage: ERROR_MESSAGES[ErrorType.API_TIMEOUT].description,
           retryable: true,
           suggestedAction: ERROR_MESSAGES[ErrorType.API_TIMEOUT].action,
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -29,10 +28,11 @@ export class LangGraphErrorHandler {
         return {
           step: 'filter',
           type: ErrorType.API_RATE_LIMIT,
-          message: `Filter rate limit: ${error.message}`,
+          message: `Filter rate limited: ${error.message}`,
           userMessage: ERROR_MESSAGES[ErrorType.API_RATE_LIMIT].description,
           retryable: true,
           suggestedAction: ERROR_MESSAGES[ErrorType.API_RATE_LIMIT].action,
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -45,6 +45,7 @@ export class LangGraphErrorHandler {
           userMessage: ERROR_MESSAGES[ErrorType.NETWORK_ERROR].description,
           retryable: true,
           suggestedAction: ERROR_MESSAGES[ErrorType.NETWORK_ERROR].action,
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -57,6 +58,7 @@ export class LangGraphErrorHandler {
           userMessage: ERROR_MESSAGES[ErrorType.VALIDATION].description,
           retryable: false,
           suggestedAction: ERROR_MESSAGES[ErrorType.VALIDATION].action,
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -68,6 +70,7 @@ export class LangGraphErrorHandler {
         userMessage: ERROR_MESSAGES[ErrorType.API_ERROR].description,
         retryable: true,
         suggestedAction: ERROR_MESSAGES[ErrorType.API_ERROR].action,
+        timestamp: new Date().toISOString(),
       };
     }
 
@@ -79,6 +82,7 @@ export class LangGraphErrorHandler {
       userMessage: ERROR_MESSAGES[ErrorType.UNKNOWN].description,
       retryable: true,
       suggestedAction: ERROR_MESSAGES[ErrorType.UNKNOWN].action,
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -86,8 +90,6 @@ export class LangGraphErrorHandler {
    * Handle errors from the Analyzer Agent
    */
   static handleAnalyzerError(error: unknown): ErrorDetails {
-    console.error('ERROR: Analyzer Agent failed:', error);
-    
     if (error instanceof Error) {
       // API timeout errors
       if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
@@ -98,6 +100,7 @@ export class LangGraphErrorHandler {
           userMessage: ERROR_MESSAGES[ErrorType.API_TIMEOUT].description,
           retryable: true,
           suggestedAction: ERROR_MESSAGES[ErrorType.API_TIMEOUT].action,
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -106,10 +109,11 @@ export class LangGraphErrorHandler {
         return {
           step: 'analyze',
           type: ErrorType.API_RATE_LIMIT,
-          message: `Analyzer rate limit: ${error.message}`,
+          message: `Analyzer rate limited: ${error.message}`,
           userMessage: ERROR_MESSAGES[ErrorType.API_RATE_LIMIT].description,
           retryable: true,
           suggestedAction: ERROR_MESSAGES[ErrorType.API_RATE_LIMIT].action,
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -122,6 +126,7 @@ export class LangGraphErrorHandler {
           userMessage: ERROR_MESSAGES[ErrorType.NETWORK_ERROR].description,
           retryable: true,
           suggestedAction: ERROR_MESSAGES[ErrorType.NETWORK_ERROR].action,
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -134,6 +139,7 @@ export class LangGraphErrorHandler {
           userMessage: ERROR_MESSAGES[ErrorType.VALIDATION].description,
           retryable: false,
           suggestedAction: ERROR_MESSAGES[ErrorType.VALIDATION].action,
+          timestamp: new Date().toISOString(),
         };
       }
 
@@ -145,6 +151,7 @@ export class LangGraphErrorHandler {
         userMessage: ERROR_MESSAGES[ErrorType.API_ERROR].description,
         retryable: true,
         suggestedAction: ERROR_MESSAGES[ErrorType.API_ERROR].action,
+        timestamp: new Date().toISOString(),
       };
     }
 
@@ -156,6 +163,7 @@ export class LangGraphErrorHandler {
       userMessage: ERROR_MESSAGES[ErrorType.UNKNOWN].description,
       retryable: true,
       suggestedAction: ERROR_MESSAGES[ErrorType.UNKNOWN].action,
+      timestamp: new Date().toISOString(),
     };
   }
 
@@ -170,6 +178,7 @@ export class LangGraphErrorHandler {
       userMessage: errorDetails.userMessage,
       retryable: errorDetails.retryable ?? true,
       suggestedAction: errorDetails.suggestedAction,
+      timestamp: new Date().toISOString(),
     };
   }
 

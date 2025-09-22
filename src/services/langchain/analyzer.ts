@@ -1,285 +1,560 @@
-import { ChatPromptTemplate } from '@langchain/core/prompts';
-import { StringOutputParser } from '@langchain/core/output_parsers';
-import { 
-  AnalyzerInput, 
-  AnalyzerOutput, 
-  AnalyzerInputSchema, 
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { z } from "zod";
+import {
+  AnalysisResult,
+  AnalyzerInput,
+  AnalyzerOutput,
+  AnalyzerInputSchema,
   AnalyzerOutputSchema,
-  isValidAnalyzerOutput 
-} from '@/interfaces/langchain';
-import { aiProviderManager } from './providers';
-import { LangGraphErrorHandler } from './errorHandler';
+  AnalysisMetadata,
+  parseStructuredOutput,
+  createAnalysisMetadata,
+  isValidAnalyzerOutput,
+} from "../../interfaces/langchain";
+import { createLogger } from "../../lib/logger";
 
-/**
- * Analyzer Agent
- * Provides detailed analysis of English sentences including grammar, usage, and context
- */
-export class AnalyzerAgent {
-  private static instance: AnalyzerAgent;
+// Create scoped logger for analyzer service
+const logger = createLogger("AnalyzerAgent");
+
+// Additional result types for enhanced functionality
+export interface QuickCheckResult {
+  correctness: "correct" | "incorrect" | "partially_correct";
+  reason: string;
+  confidence: number;
+}
+
+export interface AlternativesResult {
+  alternatives: string[];
+  originalSentence: string;
+  context?: string;
+}
+
+export interface BatchAnalysisResult {
+  results: AnalyzerOutput[];
+  errors: Array<{ index: number; error: string }>;
+  totalProcessed: number;
+  successCount: number;
+  errorCount: number;
+}
+
+export interface TranslationComparisonResult {
+  original: string;
+  translation: string;
+  accuracy: number;
+  differences: string[];
+  suggestions: string[];
+  context?: string;
+}
+
+// Enhanced analyzer output with metadata
+export interface EnhancedAnalyzerOutput extends AnalyzerOutput {
+  metadata?: AnalysisMetadata;
+}
+
+class AnalyzerAgent {
+  private model: ChatGoogleGenerativeAI;
   private promptTemplate: ChatPromptTemplate;
 
   private constructor() {
-    // Create the prompt template based on ai-guide.md specifications
-    this.promptTemplate = ChatPromptTemplate.fromTemplate(`
-You are an expert English language teacher and analyzer. Your task is to provide comprehensive analysis of English sentences for language learners.
+    logger.info("Initializing AnalyzerAgent with structured output support");
 
-ANALYSIS REQUIREMENTS:
-1. Evaluate grammar correctness
-2. Assess natural usage and fluency
-3. Consider context appropriateness
-4. Provide constructive feedback
-5. Suggest improvements and alternatives
-6. Identify specific errors if any
-
-INPUT:
-Sentence: "{sentence}"
-User Translation: "{userTranslation}"
-Context: "{context}"
-
-ANALYSIS FRAMEWORK:
-- Grammar: Check syntax, tense usage, word order, agreement
-- Usage: Evaluate naturalness, common expressions, register
-- Context: Assess appropriateness for given situation
-- Alternatives: Provide better or equivalent expressions
-- Errors: Identify specific mistakes with explanations
-
-CORRECTNESS LEVELS:
-- "correct": Grammar and usage are perfect, natural English
-- "partially_correct": Minor issues that don't affect understanding
-- "incorrect": Significant errors that affect meaning or clarity
-
-OUTPUT FORMAT (JSON only):
-{{
-  "correctness": "correct" | "incorrect" | "partially_correct",
-  "meaning": "Clear explanation of what the sentence means and its usage",
-  "alternatives": ["alternative expression 1", "alternative expression 2", "..."],
-  "errors": "Detailed explanation of any errors found, or empty string if none"
-}}
-
-EXAMPLES:
-
-Input: "I am go to school."
-Output: {{
-  "correctness": "incorrect",
-  "meaning": "The speaker intends to express going to school, but the grammar is incorrect.",
-  "alternatives": ["I am going to school.", "I go to school.", "I will go to school."],
-  "errors": "Incorrect verb form: 'am go' should be 'am going' (present continuous) or 'go' (simple present). The auxiliary verb 'am' requires the -ing form of the main verb."
-}}
-
-Input: "The weather is beautiful today."
-Output: {{
-  "correctness": "correct",
-  "meaning": "This sentence describes the current weather condition as pleasant and attractive.",
-  "alternatives": ["It's a beautiful day today.", "Today's weather is lovely.", "What beautiful weather we're having today!"],
-  "errors": ""
-}}
-
-Input: "I have been lived here for five years."
-Output: {{
-  "correctness": "incorrect",
-  "meaning": "The speaker wants to express that they have resided in this location for five years.",
-  "alternatives": ["I have lived here for five years.", "I have been living here for five years."],
-  "errors": "Incorrect perfect tense usage: 'have been lived' mixes present perfect passive with active voice. Use either 'have lived' (present perfect) or 'have been living' (present perfect continuous)."
-}}
-
-CONTEXT CONSIDERATIONS:
-- If user translation is provided, compare it with the English sentence
-- If context is provided, evaluate appropriateness for that situation
-- Consider formality level and register
-- Suggest context-appropriate alternatives
-
-Respond with JSON only:
-`);
-  }
-
-  /**
-   * Get singleton instance
-   */
-  static getInstance(): AnalyzerAgent {
-    if (!AnalyzerAgent.instance) {
-      AnalyzerAgent.instance = new AnalyzerAgent();
-    }
-    return AnalyzerAgent.instance;
-  }
-
-  /**
-   * Analyze an English sentence
-   */
-  async analyzeSentence(input: AnalyzerInput): Promise<AnalyzerOutput> {
     try {
-      // Validate input
-      const validatedInput = AnalyzerInputSchema.parse(input);
-      console.log('DEBUG: Analyzer input validated:', {
-        sentence: validatedInput.sentence,
-        hasTranslation: !!validatedInput.userTranslation,
-        hasContext: !!validatedInput.context,
+      this.model = new ChatGoogleGenerativeAI({
+        model: "gemini-2.5-flash",
+        temperature: 0.3,
+        maxOutputTokens: 2048,
       });
 
-      // Create the chain
-      const chain = this.promptTemplate.pipe(
-        aiProviderManager.getModel()
-      ).pipe(
-        new StringOutputParser()
-      );
-
-      // Execute with retry logic
-      const result = await aiProviderManager.executeWithRetry(
-        async () => {
-          const response = await chain.invoke({
-            sentence: validatedInput.sentence,
-            userTranslation: validatedInput.userTranslation || "Not provided",
-            context: validatedInput.context || "Not provided",
-          });
-
-          console.log('DEBUG: Raw analyzer response:', response);
-
-          // Parse JSON response
-          let parsedResponse: Record<string, unknown>;
-          try {
-            // Clean the response to extract JSON
-            const jsonMatch = response.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
-              throw new Error('No JSON found in response');
-            }
-            parsedResponse = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-          } catch (parseError) {
-            console.error('ERROR: Failed to parse analyzer response as JSON:', parseError);
-            throw new Error(`Invalid JSON response from analyzer agent: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
-          }
-
-          // Validate the parsed response
-          const validatedOutput = AnalyzerOutputSchema.parse(parsedResponse);
-          
-          if (!isValidAnalyzerOutput(validatedOutput)) {
-            throw new Error('Analyzer response does not match expected schema');
-          }
-
-          return validatedOutput;
+      logger.debug("ChatGoogleGenerativeAI model initialized", {
+        metadata: {
+          model: "gemini-2.5-flash",
+          temperature: 0.3,
+          maxOutputTokens: 2048,
         },
-        "Sentence Analyzer"
-      );
-
-      console.log('INFO: Sentence analysis completed successfully:', {
-        correctness: result.correctness,
-        hasErrors: !!result.errors,
-        alternativesCount: result.alternatives.length,
       });
 
-      return result;
+      this.promptTemplate = ChatPromptTemplate.fromTemplate(`
+        You are an expert English language analyzer specializing in helping Thai learners improve their English.
+        
+        Analyze the following English sentence and provide comprehensive feedback:
+        
+        **Sentence to analyze:** {sentence}
+        **Context provided:** {context}
+        **User's translation attempt:** {userTranslation}
+        
+        Provide a detailed analysis that includes:
+        1. Overall correctness assessment
+        2. Clear meaning explanation
+        3. Grammar analysis with specific scoring
+        4. Vocabulary analysis and appropriateness
+        5. Context and cultural considerations
+        6. Specific improvement suggestions
+        7. Alternative expressions
+        8. Error identification and corrections
+        
+        Be constructive, encouraging, and provide actionable feedback for improvement.
+        Focus on helping the learner understand not just what's wrong, but why and how to improve.
+      `);
 
+      logger.info("AnalyzerAgent initialization completed successfully");
     } catch (error) {
-      console.error('ERROR: Sentence analysis failed:', error);
-      
-      // Handle specific error types
-      if (error instanceof Error && error.message.includes('parse')) {
-        const errorDetails = LangGraphErrorHandler.handleAnalyzerError(
-          new Error(`Validation error: ${error.message}`)
-        );
-        throw errorDetails;
-      }
-
-      const errorDetails = LangGraphErrorHandler.handleAnalyzerError(error);
-      throw errorDetails;
-    }
-  }
-
-  /**
-   * Quick correctness check (simplified version)
-   */
-  async quickCheck(sentence: string): Promise<"correct" | "incorrect" | "partially_correct"> {
-    try {
-      const result = await this.analyzeSentence({ sentence });
-      return result.correctness;
-    } catch (error) {
-      console.error('ERROR: Quick check failed:', error);
-      return "incorrect";
-    }
-  }
-
-  /**
-   * Get alternatives for a sentence
-   */
-  async getAlternatives(sentence: string, context?: string): Promise<string[]> {
-    try {
-      const result = await this.analyzeSentence({ sentence, context });
-      return result.alternatives;
-    } catch (error) {
-      console.error('ERROR: Get alternatives failed:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Batch analyze multiple sentences
-   */
-  async analyzeBatch(inputs: AnalyzerInput[]): Promise<AnalyzerOutput[]> {
-    const results: AnalyzerOutput[] = [];
-    
-    for (const input of inputs) {
-      try {
-        const result = await this.analyzeSentence(input);
-        results.push(result);
-      } catch (error) {
-        console.error('ERROR: Batch analysis item failed:', error);
-        // Add a failed result
-        results.push({
-          correctness: "incorrect",
-          meaning: `Analysis failed: ${error instanceof Error ? error.message : String(error)}`,
-          alternatives: [],
-          errors: "Unable to analyze due to processing error",
-        });
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * Compare user translation with English sentence
-   */
-  async compareTranslation(sentence: string, userTranslation: string, context?: string): Promise<{
-    analysis: AnalyzerOutput;
-    translationFeedback: string;
-  }> {
-    try {
-      const analysis = await this.analyzeSentence({ 
-        sentence, 
-        userTranslation, 
-        context 
-      });
-
-      // Generate specific translation feedback
-      const translationFeedback = this.generateTranslationFeedback(
-        sentence, 
-        userTranslation, 
-        analysis
-      );
-
-      return {
-        analysis,
-        translationFeedback,
-      };
-    } catch (error) {
-      console.error('ERROR: Translation comparison failed:', error);
+      logger.error("Failed to initialize AnalyzerAgent", error as Error);
       throw error;
     }
   }
 
   /**
-   * Generate feedback for user translation
+   * Analyze a sentence with comprehensive structured output
    */
-  private generateTranslationFeedback(
-    sentence: string, 
-    userTranslation: string, 
-    analysis: AnalyzerOutput
-  ): string {
-    if (analysis.correctness === "correct") {
-      return `Your translation captures the meaning well. The English sentence "${sentence}" is grammatically correct and natural.`;
-    } else if (analysis.correctness === "partially_correct") {
-      return `Your translation is on the right track. The English sentence has minor issues: ${analysis.errors}`;
-    } else {
-      return `Your translation idea is good, but the English sentence needs improvement: ${analysis.errors}. Consider these alternatives: ${analysis.alternatives.join(', ')}`;
+  async analyzeSentence(input: AnalyzerInput): Promise<EnhancedAnalyzerOutput> {
+    const startTime = Date.now();
+    logger.info("Starting sentence analysis", {
+      metadata: {
+        hasContext: !!input.context,
+        hasUserTranslation: !!input.userTranslation,
+      },
+    });
+
+    try {
+      // Validate input
+      const validationResult = AnalyzerInputSchema.safeParse(input);
+      if (!validationResult.success) {
+        const error = new Error(
+          `Invalid input: ${validationResult.error.issues.map((i) => i.message).join(", ")}`
+        );
+        logger.error("Input validation failed", error, {
+          metadata: {
+            inputSentence: input.sentence.substring(0, 50) + "...",
+          },
+        });
+        throw error;
+      }
+
+      logger.debug("Input validation passed", {
+        metadata: {
+          sentenceLength: input.sentence.length,
+        },
+      });
+
+      // Create structured output chain
+      const structuredModel =
+        this.model.withStructuredOutput(AnalyzerOutputSchema);
+      const chain = this.promptTemplate.pipe(structuredModel);
+
+      logger.debug("Invoking AI model for analysis", {
+        metadata: {
+          modelType: "structured",
+        },
+      });
+
+      // Execute analysis
+      const result = await this.executeWithRetry(
+        () =>
+          chain.invoke({
+            sentence: input.sentence,
+            context: input.context || "No specific context provided",
+            userTranslation: input.userTranslation || "No translation provided",
+          }),
+        3
+      );
+
+      const processingTime = Date.now() - startTime;
+
+      // Validate result
+      const parsedResult = parseStructuredOutput(AnalyzerOutputSchema, result);
+      if (!parsedResult.success) {
+        const error = new Error(
+          `Invalid analysis result: ${parsedResult.error.message}`
+        );
+        logger.error("Analysis result validation failed", error, {
+          metadata: {
+            processingTime,
+          },
+        });
+        throw error;
+      }
+
+      // Add metadata
+      const metadata = createAnalysisMetadata(
+        "gemini-1.5-flash",
+        processingTime,
+        parsedResult.data.confidence,
+        0
+      );
+
+      const enhancedResult: EnhancedAnalyzerOutput = {
+        ...parsedResult.data,
+        metadata,
+      };
+
+      logger.info("Sentence analysis completed successfully", {
+        metadata: {
+          processingTime,
+          correctness: enhancedResult.correctness,
+          confidence: enhancedResult.confidence,
+          grammarScore: enhancedResult.grammarAnalysis?.score,
+          vocabularyScore: enhancedResult.vocabularyAnalysis?.score,
+        },
+      });
+
+      return enhancedResult;
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      logger.error("Sentence analysis failed", error as Error, {
+        metadata: {
+          processingTime,
+          inputSentence: input.sentence.substring(0, 50) + "...",
+        },
+      });
+      throw error;
     }
+  }
+
+  /**
+   * Quick correctness check with logging
+   */
+  async quickCheck(sentence: string): Promise<QuickCheckResult> {
+    const startTime = Date.now();
+    logger.info("Starting quick correctness check", {
+      metadata: {
+        sentenceLength: sentence.length,
+      },
+    });
+
+    try {
+      const result = await this.executeWithRetry(async () => {
+        const response = await this.model.invoke([
+          {
+            role: "user",
+            content: `Quickly assess if this English sentence is grammatically correct and natural: "${sentence}". Respond with just "correct", "incorrect", or "partially_correct" and a brief reason.`,
+          },
+        ]);
+
+        const content = response.content.toString().toLowerCase();
+        let correctness: "correct" | "incorrect" | "partially_correct" =
+          "incorrect";
+
+        if (content.includes("correct") && !content.includes("incorrect")) {
+          correctness = "correct";
+        } else if (
+          content.includes("partially") ||
+          content.includes("partial")
+        ) {
+          correctness = "partially_correct";
+        }
+
+        return {
+          correctness,
+          reason: response.content.toString(),
+          confidence: 0.8,
+        };
+      }, 2);
+
+      const processingTime = Date.now() - startTime;
+
+      logger.info("Quick check completed", {
+        metadata: {
+          processingTime,
+          correctness: result.correctness,
+          confidence: result.confidence,
+        },
+      });
+
+      return result;
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      logger.error("Quick check failed", error as Error, {
+        metadata: {
+          processingTime,
+          sentence: sentence.substring(0, 50) + "...",
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get alternative expressions with logging
+   */
+  async getAlternatives(
+    sentence: string,
+    context?: string
+  ): Promise<AlternativesResult> {
+    const startTime = Date.now();
+    logger.info("Getting alternative expressions", {
+      metadata: {
+        hasContext: !!context,
+        sentenceLength: sentence.length,
+      },
+    });
+
+    try {
+      const result = await this.executeWithRetry(async () => {
+        const contextPrompt = context ? ` in the context of: ${context}` : "";
+        const response = await this.model.invoke([
+          {
+            role: "user",
+            content: `Provide 3-5 alternative ways to express this English sentence: "${sentence}"${contextPrompt}. Focus on natural, commonly used expressions.`,
+          },
+        ]);
+
+        const alternatives = response.content
+          .toString()
+          .split("\n")
+          .filter((line) => line.trim().length > 0)
+          .map((line) => line.replace(/^\d+\.?\s*/, "").trim())
+          .filter((alt) => alt.length > 0)
+          .slice(0, 5);
+
+        return {
+          alternatives,
+          originalSentence: sentence,
+          context: context || undefined,
+        };
+      }, 2);
+
+      const processingTime = Date.now() - startTime;
+
+      logger.info("Alternative expressions generated", {
+        metadata: {
+          processingTime,
+          alternativeCount: result.alternatives.length,
+        },
+      });
+
+      return result;
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      logger.error("Failed to get alternatives", error as Error, {
+        metadata: {
+          processingTime,
+          sentence: sentence.substring(0, 50) + "...",
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze multiple sentences in batch with logging
+   */
+  async analyzeBatch(inputs: AnalyzerInput[]): Promise<BatchAnalysisResult> {
+    const startTime = Date.now();
+    logger.info("Starting batch analysis", {
+      metadata: {
+        batchSize: inputs.length,
+      },
+    });
+
+    try {
+      const results: AnalyzerOutput[] = [];
+      const errors: Array<{ index: number; error: string }> = [];
+
+      for (let i = 0; i < inputs.length; i++) {
+        try {
+          logger.debug(`Processing batch item ${i + 1}/${inputs.length}`, {
+            metadata: {
+              itemIndex: i,
+            },
+          });
+
+          const result = await this.analyzeSentence(inputs[i]);
+          results.push(result);
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Unknown error";
+          errors.push({ index: i, error: errorMessage });
+
+          logger.error(`Batch item ${i + 1} failed`, error as Error, {
+            metadata: {
+              itemIndex: i,
+            },
+          });
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
+      const successCount = results.length;
+      const errorCount = errors.length;
+
+      logger.info("Batch analysis completed", {
+        metadata: {
+          processingTime,
+          totalItems: inputs.length,
+          successCount,
+          errorCount,
+          successRate: (successCount / inputs.length) * 100,
+        },
+      });
+
+      return {
+        results,
+        errors,
+        totalProcessed: inputs.length,
+        successCount,
+        errorCount,
+      };
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      logger.error("Batch analysis failed", error as Error, {
+        metadata: {
+          processingTime,
+          batchSize: inputs.length,
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Compare translation with original with logging
+   */
+  async compareTranslation(
+    original: string,
+    translation: string,
+    context?: string
+  ): Promise<TranslationComparisonResult> {
+    const startTime = Date.now();
+    logger.info("Starting translation comparison", {
+      metadata: {
+        hasContext: !!context,
+        originalLength: original.length,
+        translationLength: translation.length,
+      },
+    });
+
+    try {
+      const result = await this.executeWithRetry(async () => {
+        const contextPrompt = context ? ` Context: ${context}` : "";
+        const response = await this.model.invoke([
+          {
+            role: "user",
+            content: `Compare this translation accuracy:
+              Original: "${original}"
+              Translation: "${translation}"${contextPrompt}
+              
+              Rate accuracy (0-100), identify differences, and suggest improvements.`,
+          },
+        ]);
+
+        const content = response.content.toString();
+        const accuracyMatch = content.match(
+          /(\d+)(?:\s*\/\s*100|\s*%|\s*out\s+of\s+100)/i
+        );
+        const accuracy = accuracyMatch ? parseInt(accuracyMatch[1]) : 75;
+
+        return {
+          original,
+          translation,
+          accuracy,
+          differences: [content],
+          suggestions: [`Review the analysis: ${content}`],
+          context,
+        };
+      }, 2);
+
+      const processingTime = Date.now() - startTime;
+
+      logger.info("Translation comparison completed", {
+        metadata: {
+          processingTime,
+          accuracy: result.accuracy,
+        },
+      });
+
+      return result;
+    } catch (error) {
+      const processingTime = Date.now() - startTime;
+      logger.error("Translation comparison failed", error as Error, {
+        metadata: {
+          processingTime,
+        },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Execute operation with retry logic and logging
+   */
+  private async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3
+  ): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        logger.debug(`Executing operation attempt ${attempt}/${maxRetries}`, {
+          metadata: {
+            attempt,
+            maxRetries,
+          },
+        });
+
+        const result = await operation();
+
+        if (attempt > 1) {
+          logger.info(`Operation succeeded on retry attempt ${attempt}`, {
+            metadata: {
+              attempt,
+              maxRetries,
+            },
+          });
+        }
+
+        return result;
+      } catch (error) {
+        lastError = error as Error;
+
+        logger.error(
+          `Operation failed on attempt ${attempt}/${maxRetries}`,
+          lastError,
+          {
+            metadata: {
+              attempt,
+              maxRetries,
+              willRetry: attempt < maxRetries,
+            },
+          }
+        );
+
+        if (attempt === maxRetries) {
+          break;
+        }
+
+        // Exponential backoff
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        logger.debug(`Waiting ${delay}ms before retry`, {
+          metadata: {
+            delay,
+            nextAttempt: attempt + 1,
+          },
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    logger.error("All retry attempts exhausted", lastError!, {
+      metadata: {
+        maxRetries,
+        finalError: lastError?.message,
+      },
+    });
+
+    throw lastError;
+  }
+
+  // Singleton pattern
+  private static instance: AnalyzerAgent;
+
+  static getInstance(): AnalyzerAgent {
+    if (!AnalyzerAgent.instance) {
+      AnalyzerAgent.instance = new AnalyzerAgent();
+    }
+    return AnalyzerAgent.instance;
   }
 }
 
