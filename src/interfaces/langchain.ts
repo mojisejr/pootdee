@@ -258,40 +258,44 @@ export const ERROR_MESSAGES: Record<ErrorType, {
 // Type Guards
 // ============================================================================
 
-export function isValidSentenceFilterOutput(obj: any): obj is SentenceFilterOutput {
+export function isValidSentenceFilterOutput(obj: unknown): obj is SentenceFilterOutput {
   return SentenceFilterOutputSchema.safeParse(obj).success;
 }
 
-export function isValidAnalyzerOutput(obj: any): obj is AnalyzerOutput {
+export function isValidAnalyzerOutput(obj: unknown): obj is AnalyzerOutput {
   return AnalyzerOutputSchema.safeParse(obj).success;
 }
 
-export function isValidAnalyzeRequest(obj: any): obj is AnalyzeRequest {
+export function isValidAnalyzeRequest(obj: unknown): obj is AnalyzeRequest {
   return AnalyzeRequestSchema.safeParse(obj).success;
 }
 
-export function isValidWorkflowState(obj: any): obj is WorkflowState {
+export function isValidWorkflowState(obj: unknown): obj is WorkflowState {
   return (
     typeof obj === 'object' &&
     obj !== null &&
+    'input' in obj &&
     typeof obj.input === 'object' &&
     obj.input !== null &&
+    'sentence' in obj.input &&
     typeof obj.input.sentence === 'string' &&
-    (obj.filterResult === null || isValidSentenceFilterOutput(obj.filterResult)) &&
-    (obj.analysisResult === null || isValidAnalyzerOutput(obj.analysisResult)) &&
-    (obj.error === null || typeof obj.error === 'object') &&
+    ('filterResult' in obj && (obj.filterResult === null || isValidSentenceFilterOutput(obj.filterResult))) &&
+    ('analysisResult' in obj && (obj.analysisResult === null || isValidAnalyzerOutput(obj.analysisResult))) &&
+    ('error' in obj && (obj.error === null || typeof obj.error === 'object')) &&
+    'isComplete' in obj &&
     typeof obj.isComplete === 'boolean'
   );
 }
 
-export function isValidAnalysisResult(obj: any): obj is AnalysisResult {
+export function isValidAnalysisResult(obj: unknown): obj is AnalysisResult {
   return (
     typeof obj === 'object' &&
     obj !== null &&
+    'success' in obj &&
     typeof obj.success === 'boolean' &&
-    (obj.error === null || typeof obj.error === 'object') &&
-    (obj.filterResult === null || isValidSentenceFilterOutput(obj.filterResult)) &&
-    (obj.analysisResult === null || isValidAnalyzerOutput(obj.analysisResult))
+    ('error' in obj && (obj.error === null || typeof obj.error === 'object')) &&
+    ('filterResult' in obj && (obj.filterResult === null || isValidSentenceFilterOutput(obj.filterResult))) &&
+    ('analysisResult' in obj && (obj.analysisResult === null || isValidAnalyzerOutput(obj.analysisResult)))
   );
 }
 

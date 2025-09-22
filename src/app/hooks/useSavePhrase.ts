@@ -73,7 +73,7 @@ export function useSavePhrase(): UseSavePhraseReturn {
    * Future phases will integrate with actual Sanity backend
    */
   const simulateSaveApi = useCallback(
-    async (data: SaveInput): Promise<SaveApiResponse> => {
+    async (): Promise<SaveApiResponse> => {
       // Simulate network delay
       await new Promise((resolve) =>
         setTimeout(resolve, 1000 + Math.random() * 1000)
@@ -153,7 +153,7 @@ export function useSavePhrase(): UseSavePhraseReturn {
         };
 
         // Simulate API call
-        const apiResponse = await simulateSaveApi(saveData);
+        const apiResponse = await simulateSaveApi();
 
         if (!apiResponse.success) {
           setState((prev) => ({

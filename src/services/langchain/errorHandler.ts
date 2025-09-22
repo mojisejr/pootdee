@@ -203,7 +203,7 @@ export class LangGraphErrorHandler {
   /**
    * Log error for debugging purposes
    */
-  static logError(error: ErrorDetails, context?: Record<string, any>): void {
+  static logError(error: ErrorDetails, context?: Record<string, unknown>): void {
     const logData = {
       timestamp: new Date().toISOString(),
       step: error.step,
