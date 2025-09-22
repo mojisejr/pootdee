@@ -3,208 +3,218 @@
  * Handles validation, state management, and API calls for saving phrases
  */
 
-import { useState, useCallback } from 'react'
-import { useUser } from '@clerk/nextjs'
-import { 
-  SaveInput, 
-  validateSaveInput, 
+import { useState, useCallback } from "react";
+import { useUser } from "@clerk/nextjs";
+import {
+  SaveInput,
+  validateSaveInput,
   SaveValidationResult,
-  SaveValidationError 
-} from '@/interfaces/save'
+  SaveValidationError,
+} from "@/interfaces/save";
 
 // Hook state interface
 interface UseSavePhraseState {
-  isSaving: boolean
-  error: string | null
-  validationErrors: SaveValidationError['error'] | null
-  lastSavedData: SaveInput | null
+  isSaving: boolean;
+  error: string | null;
+  validationErrors: SaveValidationError["error"] | null;
+  lastSavedData: SaveInput | null;
 }
 
 // Hook return interface
 interface UseSavePhraseReturn {
   // State
-  isSaving: boolean
-  error: string | null
-  validationErrors: SaveValidationError['error'] | null
-  lastSavedData: SaveInput | null
-  
+  isSaving: boolean;
+  error: string | null;
+  validationErrors: SaveValidationError["error"] | null;
+  lastSavedData: SaveInput | null;
+
   // Actions
-  savePhrase: (input: unknown) => Promise<boolean>
-  clearError: () => void
-  clearValidationErrors: () => void
-  reset: () => void
+  savePhrase: (input: unknown) => Promise<boolean>;
+  clearError: () => void;
+  clearValidationErrors: () => void;
+  reset: () => void;
 }
 
 // Simulated API response interface
 interface SaveApiResponse {
-  success: boolean
+  success: boolean;
   data?: {
-    id: string
-    message: string
-  }
-  error?: string
+    id: string;
+    message: string;
+  };
+  error?: string;
 }
 
 /**
  * Custom hook for saving phrases with validation and state management
- * 
+ *
  * Features:
  * - Input validation using Zod schema
  * - Loading state management
  * - Error handling for validation and API errors
  * - User authentication integration
  * - Simulated API call (Phase 4 requirement)
- * 
+ *
  * @returns Hook interface with state and actions
  */
 export function useSavePhrase(): UseSavePhraseReturn {
-  const { user, isLoaded } = useUser()
-  
+  const { user, isLoaded } = useUser();
+
   const [state, setState] = useState<UseSavePhraseState>({
     isSaving: false,
     error: null,
     validationErrors: null,
-    lastSavedData: null
-  })
+    lastSavedData: null,
+  });
 
   /**
    * Simulates API call to save phrase
    * In Phase 4, this is a mock implementation
    * Future phases will integrate with actual Sanity backend
    */
-  const simulateSaveApi = useCallback(async (data: SaveInput): Promise<SaveApiResponse> => {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000))
-    
-    // Simulate occasional API errors for testing
-    if (Math.random() < 0.1) { // 10% chance of simulated error
+  const simulateSaveApi = useCallback(
+    async (data: SaveInput): Promise<SaveApiResponse> => {
+      // Simulate network delay
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1000 + Math.random() * 1000)
+      );
+
+      // Simulate occasional API errors for testing
+      if (Math.random() < 0.1) {
+        // 10% chance of simulated error
+        return {
+          success: false,
+          error: "Simulated API error - please try again",
+        };
+      }
+
+      // Simulate successful save
       return {
-        success: false,
-        error: 'Simulated API error - please try again'
-      }
-    }
-    
-    // Simulate successful save
-    return {
-      success: true,
-      data: {
-        id: `phrase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        message: 'Phrase saved successfully!'
-      }
-    }
-  }, [])
+        success: true,
+        data: {
+          id: `phrase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          message: "Phrase saved successfully!",
+        },
+      };
+    },
+    []
+  );
 
   /**
    * Main save function with validation and error handling
    */
-  const savePhrase = useCallback(async (input: unknown): Promise<boolean> => {
-    // Check if user is authenticated
-    if (!isLoaded) {
-      setState(prev => ({
-        ...prev,
-        error: 'Authentication is loading, please wait...'
-      }))
-      return false
-    }
-
-    if (!user) {
-      setState(prev => ({
-        ...prev,
-        error: 'You must be signed in to save phrases'
-      }))
-      return false
-    }
-
-    // Clear previous errors
-    setState(prev => ({
-      ...prev,
-      error: null,
-      validationErrors: null,
-      isSaving: true
-    }))
-
-    try {
-      // Validate input
-      const validationResult: SaveValidationResult = validateSaveInput(input)
-      
-      if (!validationResult.success) {
-        setState(prev => ({
+  const savePhrase = useCallback(
+    async (input: unknown): Promise<boolean> => {
+      // Check if user is authenticated
+      if (!isLoaded) {
+        setState((prev) => ({
           ...prev,
-          isSaving: false,
-          validationErrors: validationResult.error
-        }))
-        return false
+          error: "Authentication is loading, please wait...",
+        }));
+        return false;
       }
 
-      // Add userId to validated data
-      const saveData: SaveInput = {
-        ...validationResult.data,
-        // Note: userId will be handled server-side in actual implementation
-        // For Phase 4, we're just validating the client-side data structure
-      }
-
-      // Simulate API call
-      const apiResponse = await simulateSaveApi(saveData)
-      
-      if (!apiResponse.success) {
-        setState(prev => ({
+      if (!user) {
+        setState((prev) => ({
           ...prev,
-          isSaving: false,
-          error: apiResponse.error || 'Failed to save phrase'
-        }))
-        return false
+          error: "You must be signed in to save phrases",
+        }));
+        return false;
       }
 
-      // Success
-      setState(prev => ({
+      // Clear previous errors
+      setState((prev) => ({
         ...prev,
-        isSaving: false,
-        lastSavedData: saveData,
         error: null,
-        validationErrors: null
-      }))
+        validationErrors: null,
+        isSaving: true,
+      }));
 
-      console.log('INFO: Phrase saved successfully', {
-        phraseId: apiResponse.data?.id,
-        userId: user.id,
-        englishPhrase: saveData.englishPhrase.substring(0, 50) + '...',
-        timestamp: new Date().toISOString()
-      })
+      try {
+        // Validate input
+        const validationResult: SaveValidationResult = validateSaveInput(input);
 
-      return true
+        console.log("DEBUG: Validation result:", validationResult);
 
-    } catch (error) {
-      console.error('ERROR: Unexpected error during phrase save:', error)
-      
-      setState(prev => ({
-        ...prev,
-        isSaving: false,
-        error: 'An unexpected error occurred while saving'
-      }))
-      
-      return false
-    }
-  }, [user, isLoaded, simulateSaveApi])
+        if (!validationResult.success) {
+          setState((prev) => ({
+            ...prev,
+            isSaving: false,
+            validationErrors: validationResult.error,
+          }));
+          return false;
+        }
+
+        // Add userId to validated data
+        const saveData: SaveInput = {
+          ...validationResult.data,
+          // Note: userId will be handled server-side in actual implementation
+          // For Phase 4, we're just validating the client-side data structure
+        };
+
+        // Simulate API call
+        const apiResponse = await simulateSaveApi(saveData);
+
+        if (!apiResponse.success) {
+          setState((prev) => ({
+            ...prev,
+            isSaving: false,
+            error: apiResponse.error || "Failed to save phrase",
+          }));
+          return false;
+        }
+
+        // Success
+        setState((prev) => ({
+          ...prev,
+          isSaving: false,
+          lastSavedData: saveData,
+          error: null,
+          validationErrors: null,
+        }));
+
+        console.log("INFO: Phrase saved successfully", {
+          phraseId: apiResponse.data?.id,
+          userId: user.id,
+          englishPhrase: saveData.englishPhrase.substring(0, 50) + "...",
+          timestamp: new Date().toISOString(),
+        });
+
+        return true;
+      } catch (error) {
+        console.error("ERROR: Unexpected error during phrase save:", error);
+
+        setState((prev) => ({
+          ...prev,
+          isSaving: false,
+          error: "An unexpected error occurred while saving",
+        }));
+
+        return false;
+      }
+    },
+    [user, isLoaded, simulateSaveApi]
+  );
 
   /**
    * Clear general error state
    */
   const clearError = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
-      error: null
-    }))
-  }, [])
+      error: null,
+    }));
+  }, []);
 
   /**
    * Clear validation errors
    */
   const clearValidationErrors = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
-      validationErrors: null
-    }))
-  }, [])
+      validationErrors: null,
+    }));
+  }, []);
 
   /**
    * Reset all state to initial values
@@ -214,9 +224,9 @@ export function useSavePhrase(): UseSavePhraseReturn {
       isSaving: false,
       error: null,
       validationErrors: null,
-      lastSavedData: null
-    })
-  }, [])
+      lastSavedData: null,
+    });
+  }, []);
 
   return {
     // State
@@ -224,11 +234,11 @@ export function useSavePhrase(): UseSavePhraseReturn {
     error: state.error,
     validationErrors: state.validationErrors,
     lastSavedData: state.lastSavedData,
-    
+
     // Actions
     savePhrase,
     clearError,
     clearValidationErrors,
-    reset
-  }
+    reset,
+  };
 }

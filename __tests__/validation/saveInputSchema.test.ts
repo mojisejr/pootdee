@@ -18,10 +18,7 @@ describe('Save Input Validation Schema', () => {
       const validInput: SaveInput = {
         englishPhrase: "Hello world",
         userTranslation: "สวัสดีโลก",
-        context: "",
-        difficulty: 'beginner',
-        isBookmarked: false,
-        tags: []
+        context: ""
       };
 
       const result = SaveInputSchema.safeParse(validInput);
@@ -31,9 +28,6 @@ describe('Save Input Validation Schema', () => {
         expect(result.data.englishPhrase).toBe(validInput.englishPhrase);
         expect(result.data.userTranslation).toBe(validInput.userTranslation);
         expect(result.data.context).toBe("");
-        expect(result.data.tags).toEqual([]);
-        expect(result.data.difficulty).toBe('beginner');
-        expect(result.data.isBookmarked).toBe(false);
       }
     });
 
@@ -41,10 +35,7 @@ describe('Save Input Validation Schema', () => {
       const validInput: SaveInput = {
         englishPhrase: "How are you doing today?",
         userTranslation: "วันนี้เป็นอย่างไรบ้าง",
-        context: "Casual greeting between friends",
-        difficulty: 'intermediate',
-        isBookmarked: true,
-        tags: ["greeting", "casual", "friends"]
+        context: "Casual greeting between friends"
       };
 
       const result = SaveInputSchema.safeParse(validInput);
@@ -54,9 +45,6 @@ describe('Save Input Validation Schema', () => {
         expect(result.data.englishPhrase).toBe(validInput.englishPhrase);
         expect(result.data.userTranslation).toBe(validInput.userTranslation);
         expect(result.data.context).toBe(validInput.context);
-        expect(result.data.tags).toEqual(validInput.tags);
-        expect(result.data.difficulty).toBe('intermediate');
-        expect(result.data.isBookmarked).toBe(true);
       }
     });
 
@@ -64,30 +52,25 @@ describe('Save Input Validation Schema', () => {
       const maxLengthInput: SaveInput = {
         englishPhrase: "a".repeat(VALIDATION_CONSTANTS.MAX_PHRASE_LENGTH),
         userTranslation: "ก".repeat(VALIDATION_CONSTANTS.MAX_TRANSLATION_LENGTH),
-        context: "c".repeat(VALIDATION_CONSTANTS.MAX_CONTEXT_LENGTH),
-        difficulty: 'advanced',
-        isBookmarked: false,
-        tags: Array(VALIDATION_CONSTANTS.MAX_TAGS).fill("tag")
+        context: "c".repeat(VALIDATION_CONSTANTS.MAX_CONTEXT_LENGTH)
       };
 
       const result = SaveInputSchema.safeParse(maxLengthInput);
       expect(result.success).toBe(true);
     });
 
-    it('should handle optional fields with defaults', () => {
+    it('should handle optional fields', () => {
       const minimalInput = {
-        englishPhrase: "Hello",
-        userTranslation: "สวัสดี"
+        englishPhrase: "Hello"
       };
 
       const result = SaveInputSchema.safeParse(minimalInput);
       expect(result.success).toBe(true);
       
       if (result.success) {
-        expect(result.data.difficulty).toBe('beginner'); // default
-        expect(result.data.isBookmarked).toBe(false); // default
-        expect(result.data.tags).toEqual([]); // default
-        expect(result.data.context).toBeUndefined(); // optional
+        expect(result.data.englishPhrase).toBe("Hello");
+        expect(result.data.userTranslation).toBeUndefined();
+        expect(result.data.context).toBeUndefined();
       }
     });
 
@@ -95,8 +78,7 @@ describe('Save Input Validation Schema', () => {
       const whitespaceInput = {
         englishPhrase: "   Hello   ",
         userTranslation: "   สวัสดี   ",
-        context: "   Context   ",
-        tags: ["   tag1   ", "   tag2   "]
+        context: "   Context   "
       };
 
       const result = SaveInputSchema.safeParse(whitespaceInput);
@@ -106,7 +88,6 @@ describe('Save Input Validation Schema', () => {
         expect(result.data.englishPhrase).toBe("Hello");
         expect(result.data.userTranslation).toBe("สวัสดี");
         expect(result.data.context).toBe("Context");
-        expect(result.data.tags).toEqual(["tag1", "tag2"]);
       }
     });
   });
@@ -126,23 +107,6 @@ describe('Save Input Validation Schema', () => {
           issue.path.includes('englishPhrase')
         );
         expect(phraseError).toBeDefined();
-      }
-    });
-
-    it('should reject empty userTranslation', () => {
-      const invalidInput = {
-        englishPhrase: "Hello",
-        userTranslation: ""
-      };
-
-      const result = SaveInputSchema.safeParse(invalidInput);
-      expect(result.success).toBe(false);
-      
-      if (!result.success) {
-        const translationError = result.error.issues.find(issue => 
-          issue.path.includes('userTranslation')
-        );
-        expect(translationError).toBeDefined();
       }
     });
 
@@ -216,125 +180,14 @@ describe('Save Input Validation Schema', () => {
       }
     });
 
-    it('should reject too many tags', () => {
-      const invalidInput: Partial<SaveInput> = {
-        englishPhrase: "Hello",
-        userTranslation: "สวัสดี",
-        tags: Array(VALIDATION_CONSTANTS.MAX_TAGS + 1).fill("tag")
-      };
-
-      const result = SaveInputSchema.safeParse(invalidInput);
-      expect(result.success).toBe(false);
-      
-      if (!result.success) {
-        const tagsError = result.error.issues.find(issue => 
-          issue.path.includes('tags') && issue.code === 'too_big'
-        );
-        expect(tagsError).toBeDefined();
-        expect(tagsError?.message).toContain('Maximum 10 tags allowed');
-      }
-    });
-
-    it('should reject empty tags in array', () => {
-      const invalidInput: Partial<SaveInput> = {
-        englishPhrase: "Hello",
-        userTranslation: "สวัสดี",
-        tags: ["valid", "", "another"]
-      };
-
-      const result = SaveInputSchema.safeParse(invalidInput);
-      expect(result.success).toBe(false);
-      
-      if (!result.success) {
-        const tagError = result.error.issues.find(issue => 
-          issue.path.includes('tags')
-        );
-        expect(tagError).toBeDefined();
-      }
-    });
-
-    it('should reject invalid difficulty level', () => {
+    it('should reject invalid data types', () => {
       const invalidInput = {
-        englishPhrase: "Hello",
-        userTranslation: "สวัสดี",
-        difficulty: "expert" // Invalid difficulty
+        englishPhrase: 123, // should be string
+        userTranslation: true, // should be string
+        context: [] // should be string
       };
 
       const result = SaveInputSchema.safeParse(invalidInput);
-      expect(result.success).toBe(false);
-      
-      if (!result.success) {
-        const difficultyError = result.error.issues.find(issue => 
-          issue.path.includes('difficulty')
-        );
-        expect(difficultyError).toBeDefined();
-      }
-    });
-
-    it('should reject input with wrong field types', () => {
-      const invalidInput = {
-        englishPhrase: 123, // Should be string
-        userTranslation: true, // Should be string
-        context: null, // Should be string
-        tags: "not an array", // Should be array
-        difficulty: 42, // Should be enum
-        isBookmarked: "yes" // Should be boolean
-      };
-
-      const result = SaveInputSchema.safeParse(invalidInput);
-      expect(result.success).toBe(false);
-      
-      if (!result.success) {
-        const typeErrors = result.error.issues.filter(issue => 
-          issue.code === 'invalid_type'
-        );
-        expect(typeErrors.length).toBeGreaterThan(0);
-      }
-    });
-  });
-
-  describe('validateSaveInput Helper Function', () => {
-    it('should return success for valid input', () => {
-      const validInput: SaveInput = {
-        englishPhrase: "Hello world",
-        userTranslation: "สวัสดีโลก",
-        context: "",
-        difficulty: 'beginner',
-        isBookmarked: false,
-        tags: []
-      };
-
-      const result = validateSaveInput(validInput);
-      expect(result.success).toBe(true);
-      
-      if (result.success) {
-        expect(result.data).toEqual(validInput);
-      }
-    });
-
-    it('should return error for invalid input', () => {
-      const invalidInput = {
-        englishPhrase: "",
-        userTranslation: ""
-      };
-
-      const result = validateSaveInput(invalidInput);
-      expect(result.success).toBe(false);
-      
-      if (!result.success) {
-        expect(result.error.message).toBe('Validation failed');
-        expect(result.error.issues).toBeInstanceOf(Array);
-        expect(result.error.issues.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('should handle unknown input gracefully', () => {
-      const unknownInput = {
-        randomField: "random value",
-        anotherField: 123
-      };
-
-      const result = validateSaveInput(unknownInput);
       expect(result.success).toBe(false);
       
       if (!result.success) {
@@ -343,99 +196,127 @@ describe('Save Input Validation Schema', () => {
     });
   });
 
-  describe('isSaveInputValid Helper Function', () => {
-    it('should return true for valid input', () => {
-      const validInput: SaveInput = {
-        englishPhrase: "Hello world",
-        userTranslation: "สวัสดีโลก",
-        context: "",
-        difficulty: 'beginner',
-        isBookmarked: false,
-        tags: []
-      };
+  describe('Helper Functions', () => {
+    describe('validateSaveInput', () => {
+      it('should return success for valid input', () => {
+        const validInput: SaveInput = {
+          englishPhrase: "Hello world",
+          userTranslation: "สวัสดีโลก",
+          context: "Greeting"
+        };
 
-      expect(isSaveInputValid(validInput)).toBe(true);
+        const result = validateSaveInput(validInput);
+        expect(result.success).toBe(true);
+        
+        if (result.success) {
+          expect(result.data).toEqual(validInput);
+        }
+      });
+
+      it('should return error for invalid input', () => {
+        const invalidInput = {
+          englishPhrase: "", // empty
+          userTranslation: "สวัสดี"
+        };
+
+        const result = validateSaveInput(invalidInput);
+        expect(result.success).toBe(false);
+        
+        if (!result.success) {
+          expect(result.error.message).toBeDefined();
+          expect(result.error.issues).toBeDefined();
+          expect(result.error.issues.length).toBeGreaterThan(0);
+        }
+      });
+
+      it('should format error messages correctly', () => {
+        const invalidInput = {
+          englishPhrase: "a".repeat(VALIDATION_CONSTANTS.MAX_PHRASE_LENGTH + 1)
+        };
+
+        const result = validateSaveInput(invalidInput);
+        expect(result.success).toBe(false);
+        
+        if (!result.success) {
+          expect(result.error.issues[0].field).toBe('englishPhrase');
+          expect(result.error.issues[0].message).toContain('less than');
+        }
+      });
     });
 
-    it('should return false for invalid input', () => {
-      const invalidInput = {
-        englishPhrase: "",
-        userTranslation: ""
-      };
+    describe('isSaveInputValid', () => {
+      it('should return true for valid input', () => {
+        const validInput: SaveInput = {
+          englishPhrase: "Hello",
+          userTranslation: "สวัสดี",
+          context: "Greeting"
+        };
 
-      expect(isSaveInputValid(invalidInput)).toBe(false);
-    });
+        expect(isSaveInputValid(validInput)).toBe(true);
+      });
 
-    it('should return false for malformed input', () => {
-      const malformedInput = {
-        englishPhrase: 123,
-        userTranslation: null
-      };
+      it('should return false for invalid input', () => {
+        const invalidInput = {
+          englishPhrase: ""
+        };
 
-      expect(isSaveInputValid(malformedInput)).toBe(false);
+        expect(isSaveInputValid(invalidInput)).toBe(false);
+      });
     });
   });
 
-  describe('Edge Cases and Special Characters', () => {
-    it('should handle Thai characters correctly', () => {
-      const thaiInput: SaveInput = {
-        englishPhrase: "Hello, my name is John",
-        userTranslation: "สวัสดีครับ ผมชื่อจอห์น",
-        context: "การแนะนำตัวเอง",
-        difficulty: 'beginner',
-        isBookmarked: false,
-        tags: ["แนะนำตัว", "ทักทาย"]
+  describe('Edge Cases', () => {
+    it('should handle null and undefined inputs', () => {
+      expect(isSaveInputValid(null)).toBe(false);
+      expect(isSaveInputValid(undefined)).toBe(false);
+      expect(isSaveInputValid({})).toBe(false);
+    });
+
+    it('should handle special characters in text fields', () => {
+      const specialCharsInput: SaveInput = {
+        englishPhrase: "Hello! @#$%^&*()_+ 123",
+        userTranslation: "สวัสดี! ๑๒๓ @#$%",
+        context: "Special chars: !@#$%^&*()"
       };
 
-      const result = SaveInputSchema.safeParse(thaiInput);
+      const result = SaveInputSchema.safeParse(specialCharsInput);
       expect(result.success).toBe(true);
     });
 
-    it('should handle special characters and emojis', () => {
-      const specialInput: SaveInput = {
-        englishPhrase: "Hello! 😊 How's it going? (Great!)",
-        userTranslation: "สวัสดี! 😊 เป็นอย่างไรบ้าง? (ดีมาก!)",
-        context: "Casual conversation with emojis & punctuation",
-        difficulty: 'intermediate',
-        isBookmarked: true,
-        tags: ["emoji", "punctuation", "casual"]
+    it('should handle unicode characters', () => {
+      const unicodeInput: SaveInput = {
+        englishPhrase: "Hello 🌍 world",
+        userTranslation: "สวัสดี 🌍 โลก",
+        context: "Unicode test 🚀"
       };
 
-      const result = SaveInputSchema.safeParse(specialInput);
+      const result = SaveInputSchema.safeParse(unicodeInput);
       expect(result.success).toBe(true);
     });
 
-    it('should handle newlines and tabs in context', () => {
-      const multilineInput: SaveInput = {
-        englishPhrase: "Line 1\nLine 2\tTabbed",
-        userTranslation: "บรรทัด 1\nบรรทัด 2\tแท็บ",
-        context: "Multi-line\ncontext with\ttabs",
-        difficulty: 'advanced',
-        isBookmarked: false,
-        tags: ["multiline", "formatting"]
+    it('should handle very long valid inputs', () => {
+      const longValidInput: SaveInput = {
+        englishPhrase: "This is a very long English phrase that tests the maximum length validation. ".repeat(10).substring(0, VALIDATION_CONSTANTS.MAX_PHRASE_LENGTH),
+        userTranslation: "นี่คือการแปลที่ยาวมากเพื่อทดสอบการตรวจสอบความยาวสูงสุด ".repeat(10).substring(0, VALIDATION_CONSTANTS.MAX_TRANSLATION_LENGTH),
+        context: "Long context description. ".repeat(20).substring(0, VALIDATION_CONSTANTS.MAX_CONTEXT_LENGTH)
       };
 
-      const result = SaveInputSchema.safeParse(multilineInput);
+      const result = SaveInputSchema.safeParse(longValidInput);
       expect(result.success).toBe(true);
     });
   });
 
   describe('Validation Constants', () => {
-    it('should have reasonable validation constants', () => {
-      expect(VALIDATION_CONSTANTS.MAX_PHRASE_LENGTH).toBeGreaterThan(0);
-      expect(VALIDATION_CONSTANTS.MAX_TRANSLATION_LENGTH).toBeGreaterThan(0);
-      expect(VALIDATION_CONSTANTS.MAX_CONTEXT_LENGTH).toBeGreaterThan(0);
-      expect(VALIDATION_CONSTANTS.MAX_TAGS).toBeGreaterThan(0);
-      
-      // Ensure reasonable limits (not too small, not too large)
-      expect(VALIDATION_CONSTANTS.MAX_PHRASE_LENGTH).toBeGreaterThanOrEqual(100);
-      expect(VALIDATION_CONSTANTS.MAX_PHRASE_LENGTH).toBeLessThanOrEqual(10000);
-      expect(VALIDATION_CONSTANTS.MAX_TAGS).toBe(10);
+    it('should have correct validation constants', () => {
+      expect(VALIDATION_CONSTANTS.MIN_PHRASE_LENGTH).toBe(1);
+      expect(VALIDATION_CONSTANTS.MAX_PHRASE_LENGTH).toBe(1000);
+      expect(VALIDATION_CONSTANTS.MIN_TRANSLATION_LENGTH).toBe(0);
+      expect(VALIDATION_CONSTANTS.MAX_TRANSLATION_LENGTH).toBe(1000);
+      expect(VALIDATION_CONSTANTS.MAX_CONTEXT_LENGTH).toBe(500);
     });
 
-    it('should have consistent min/max relationships', () => {
-      expect(VALIDATION_CONSTANTS.MIN_PHRASE_LENGTH).toBeLessThanOrEqual(VALIDATION_CONSTANTS.MAX_PHRASE_LENGTH);
-      expect(VALIDATION_CONSTANTS.MIN_TRANSLATION_LENGTH).toBeLessThanOrEqual(VALIDATION_CONSTANTS.MAX_TRANSLATION_LENGTH);
+    it('should not have removed constants', () => {
+      expect(VALIDATION_CONSTANTS).not.toHaveProperty('MAX_TAGS');
     });
   });
 });
