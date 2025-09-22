@@ -20,6 +20,13 @@ export const phraseType = defineType({
       validation: (Rule) => Rule.max(500).error('User translation must be under 500 characters')
     }),
     defineField({
+      name: 'context',
+      title: 'Context / Usage Situation',
+      type: 'text',
+      description: 'Context or situation where this phrase would be used (บริบท - ใช้ตอนไหน?)',
+      validation: (Rule) => Rule.required().max(300).error('Context is required and must be under 300 characters')
+    }),
+    defineField({
       name: 'analysis',
       title: 'AI Analysis Result',
       type: 'object',
