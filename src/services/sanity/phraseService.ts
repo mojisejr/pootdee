@@ -9,15 +9,11 @@ import {
   GET_PHRASE_BY_ID,
   GET_PHRASES_BY_DIFFICULTY,
   GET_BOOKMARKED_PHRASES,
-  GET_PHRASES_BY_TAG,
   SEARCH_PHRASES,
   GET_PHRASES_FOR_REVIEW,
   GET_USER_PHRASE_STATS,
-  GET_RECENT_PHRASES,
-  GET_PHRASES_BY_CORRECTNESS,
   GET_USER_TAGS,
-  validateQueryParams,
-  type PhraseQueryParams
+  validateQueryParams
 } from '@/sanity/lib/queries'
 import {
   type Phrase,
@@ -26,13 +22,8 @@ import {
   type PhraseResponse,
   type PhrasesResponse,
   type UserPhraseStats,
-  type PhraseFilters,
-  type PaginationOptions,
-  type PaginatedPhrasesResponse,
   type BulkCreatePhraseInput,
-  type BulkUpdatePhraseInput,
-  type BulkOperationResponse,
-  isPhrase
+  type BulkOperationResponse
 } from '@/interfaces/phrase'
 
 /**

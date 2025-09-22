@@ -3,8 +3,7 @@ import {
   AnalyzeRequest, 
   AnalyzeResponse, 
   ErrorType, 
-  ERROR_MESSAGES,
-  AnalysisResult
+  ERROR_MESSAGES
 } from '@/interfaces/langchain';
 import { SentenceFilterAgent } from './sentenceFilter';
 import { AnalyzerAgent } from './analyzer';
@@ -191,7 +190,7 @@ export class EnglishAnalysisWorkflow {
   /**
    * Health check for the workflow
    */
-  public async healthCheck(): Promise<{ status: string; details: Record<string, any> }> {
+  public async healthCheck(): Promise<{ status: string; details: Record<string, unknown> }> {
      try {
        // Test sentence filter with a simple validation
        const filterTest = await this.sentenceFilter.quickValidate('Hello world');
@@ -224,7 +223,7 @@ export class EnglishAnalysisWorkflow {
   /**
    * Get workflow configuration
    */
-  public getConfig(): Record<string, any> {
+  public getConfig(): Record<string, unknown> {
     return {
       name: 'EnglishAnalysisWorkflow',
       version: '1.0.0',

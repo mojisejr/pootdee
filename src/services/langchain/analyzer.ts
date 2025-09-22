@@ -124,7 +124,7 @@ Respond with JSON only:
 
       // Execute with retry logic
       const result = await aiProviderManager.executeWithRetry(
-        async (model) => {
+        async () => {
           const response = await chain.invoke({
             sentence: validatedInput.sentence,
             userTranslation: validatedInput.userTranslation || "Not provided",
@@ -134,14 +134,14 @@ Respond with JSON only:
           console.log('DEBUG: Raw analyzer response:', response);
 
           // Parse JSON response
-          let parsedResponse: any;
+          let parsedResponse: Record<string, unknown>;
           try {
             // Clean the response to extract JSON
             const jsonMatch = response.match(/\{[\s\S]*\}/);
             if (!jsonMatch) {
               throw new Error('No JSON found in response');
             }
-            parsedResponse = JSON.parse(jsonMatch[0]);
+            parsedResponse = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
           } catch (parseError) {
             console.error('ERROR: Failed to parse analyzer response as JSON:', parseError);
             throw new Error(`Invalid JSON response from analyzer agent: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
