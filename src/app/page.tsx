@@ -41,12 +41,21 @@ export default function Home() {
   }, [formData.englishPhrase, validationError]);
 
   // Clear analysis results when input changes significantly
+  // Track previous englishPhrase to detect actual changes
+  const [previousEnglishPhrase, setPreviousEnglishPhrase] = useState<string>("");
+  
   useEffect(() => {
-    if (analysisResult && formData.englishPhrase.trim()) {
+    const currentPhrase = formData.englishPhrase.trim();
+    
+    // Only clear results if the phrase actually changed (not just state update)
+    if (analysisResult && currentPhrase !== previousEnglishPhrase && currentPhrase !== "") {
       setAnalysisResult(null);
       setAnalysisError(null);
     }
-  }, [formData.englishPhrase, analysisResult]);
+    
+    // Update previous phrase for next comparison
+    setPreviousEnglishPhrase(currentPhrase);
+  }, [formData.englishPhrase, analysisResult, previousEnglishPhrase]);
 
   const handleInputChange = (field: keyof FormData, value: string): void => {
     setFormData((prev) => ({
@@ -82,7 +91,31 @@ export default function Home() {
         body: JSON.stringify(analyzeRequest),
       });
 
+      const data: AnalyzeResponse = await response.json();
+
       if (!response.ok) {
+        // Handle validation errors that might contain suggestions
+        if (response.status === 400 && data.error?.type === 'validation') {
+          // Check if this is a sentence filter rejection with suggestions
+          if (data.error.message && data.error.message.includes('grammatically incorrect')) {
+            // Extract the suggestion from the error message
+            const suggestionMatch = data.error.message.match(/It should be '([^']+)'/);
+            const suggestion = suggestionMatch ? suggestionMatch[1] : null;
+            
+            // Create a special analysis result for grammar corrections
+            const correctionResult: AnalysisResult = {
+              correctness: "incorrect" as const,
+              meaning: "ประโยคนี้มีไวยากรณ์ที่ไม่ถูกต้อง",
+              alternatives: suggestion ? [suggestion] : [],
+              errors: data.error.message
+            };
+            
+            setAnalysisResult(correctionResult);
+            return;
+          }
+        }
+
+        // Handle other types of errors
         let errorType: ErrorType;
         switch (response.status) {
           case 400:
@@ -101,12 +134,9 @@ export default function Home() {
             errorType = ErrorType.NETWORK_ERROR;
         }
 
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || ERROR_MESSAGES[errorType].description;
+        const errorMessage = data.error?.message || ERROR_MESSAGES[errorType].description;
         throw new Error(errorMessage);
       }
-
-      const data: AnalyzeResponse = await response.json();
 
       if (!data.data) {
         throw new Error(ERROR_MESSAGES[ErrorType.API_ERROR].description);
