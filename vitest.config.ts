@@ -5,6 +5,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    env: {
+      // Load environment variables from .env.local for testing
+      ...process.env,
+    },
+    setupFiles: ['./vitest.setup.ts'],
   },
   resolve: {
     alias: {
