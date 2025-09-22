@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/nextjs';
+import { useSavePhrase } from './hooks/useSavePhrase';
 
 interface FormData {
   englishPhrase: string;
@@ -18,7 +19,10 @@ export default function Home() {
     tags: ''
   });
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  
+  // Use the save phrase hook
+  const { savePhrase, isSaving, error: saveError } = useSavePhrase();
 
   const handleInputChange = (field: keyof FormData, value: string): void => {
     setFormData(prev => ({
@@ -33,33 +37,27 @@ export default function Home() {
       return;
     }
 
-    setIsLoading(true);
+    setIsAnalyzing(true);
     try {
       // TODO: Implement API call for analysis
-      console.log('Analyzing phrase:', formData);
+      console.log('INFO: Analyzing phrase:', formData);
       await new Promise(resolve => setTimeout(resolve, 2000)); // Mock delay
     } catch (error) {
-      console.error('Error analyzing phrase:', error);
+      console.error('ERROR: Error analyzing phrase:', error);
     } finally {
-      setIsLoading(false);
+      setIsAnalyzing(false);
     }
   };
 
   const handleSave = async (): Promise<void> => {
-    if (!formData.englishPhrase.trim() && !formData.userTranslation.trim()) {
-      alert('กรุณากรอกประโยคภาษาอังกฤษหรือคำแปลอย่างน้อย 1 ฟิลด์');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // TODO: Implement API call for saving
-      console.log('Saving phrase:', formData);
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Mock delay
-    } catch (error) {
-      console.error('Error saving phrase:', error);
-    } finally {
-      setIsLoading(false);
+    const success = await savePhrase(formData);
+    
+    if (success) {
+      console.log('INFO: Phrase saved successfully');
+      // Optionally clear form or show success message
+    } else {
+      console.log('ERROR: Failed to save phrase - error handled by hook');
+      // Error is already handled by the hook and displayed in UI
     }
   };
 
@@ -101,7 +99,7 @@ export default function Home() {
                 onChange={(e) => handleInputChange('englishPhrase', e.target.value)}
                 placeholder="Enter your English phrase..."
                 className="w-full min-h-[120px] p-5 border-2 border-border rounded-2xl text-base leading-relaxed resize-vertical transition-colors focus:border-primary focus:outline-none bg-background"
-                disabled={isLoading}
+                disabled={isAnalyzing || isSaving}
               />
             </div>
 
@@ -110,7 +108,7 @@ export default function Home() {
               <button
                 onClick={() => setIsExpanded(true)}
                 className="w-full p-3 border-2 border-dashed border-muted-foreground rounded-lg text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-                disabled={isLoading}
+                disabled={isAnalyzing || isSaving}
               >
                 + เพิ่มข้อมูล
               </button>
@@ -129,7 +127,7 @@ export default function Home() {
                     onChange={(e) => handleInputChange('userTranslation', e.target.value)}
                     placeholder="ใส่คำแปลที่คุณคิดไว้..."
                     className="w-full min-h-[100px] p-4 border-2 border-border rounded-xl text-base resize-vertical transition-colors focus:border-primary focus:outline-none bg-background"
-                    disabled={isLoading}
+                    disabled={isAnalyzing || isSaving}
                   />
                 </div>
 
@@ -144,7 +142,7 @@ export default function Home() {
                     onChange={(e) => handleInputChange('context', e.target.value)}
                     placeholder="บอกบริบทหรือสถานการณ์ที่จะใช้ประโยคนี้..."
                     className="w-full min-h-[80px] p-4 border-2 border-border rounded-xl text-base resize-vertical transition-colors focus:border-primary focus:outline-none bg-background"
-                    disabled={isLoading}
+                    disabled={isAnalyzing || isSaving}
                   />
                 </div>
 
@@ -160,14 +158,14 @@ export default function Home() {
                     onChange={(e) => handleInputChange('tags', e.target.value)}
                     placeholder="เช่น: การทำงาน, การเดินทาง, ครอบครัว"
                     className="w-full p-4 border-2 border-border rounded-xl text-base transition-colors focus:border-primary focus:outline-none bg-background"
-                    disabled={isLoading}
+                    disabled={isAnalyzing || isSaving}
                   />
                 </div>
 
                 <button
                   onClick={() => setIsExpanded(false)}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  disabled={isLoading}
+                  disabled={isAnalyzing || isSaving}
                 >
                   ซ่อนฟิลด์เพิ่มเติม
                 </button>
@@ -178,20 +176,28 @@ export default function Home() {
             <div className="flex gap-4 pt-4">
               <button
                 onClick={handleAnalyze}
-                disabled={isLoading || (!formData.englishPhrase.trim() && !formData.userTranslation.trim())}
+                disabled={isAnalyzing || isSaving || (!formData.englishPhrase.trim() && !formData.userTranslation.trim())}
                 className="flex-1 bg-gradient-to-r from-primary to-primary text-white py-4 px-6 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                {isLoading ? 'กำลังวิเคราะห์...' : 'อธิบาย!'}
+                {isAnalyzing ? 'กำลังวิเคราะห์...' : 'อธิบาย!'}
               </button>
               
               <button
                 onClick={handleSave}
-                disabled={isLoading || (!formData.englishPhrase.trim() && !formData.userTranslation.trim())}
+                disabled={isAnalyzing || isSaving || (!formData.englishPhrase.trim() && !formData.userTranslation.trim())}
                 className="flex-1 bg-gradient-to-r from-accent to-accent text-white py-4 px-6 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
               >
-                {isLoading ? 'กำลังบันทึก...' : 'เก็บ!'}
+                {isSaving ? 'กำลังบันทึก...' : 'เก็บ!'}
               </button>
             </div>
+
+            {/* Error Display */}
+            {saveError && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-red-600 text-sm font-medium">เกิดข้อผิดพลาด:</p>
+                <p className="text-red-600 text-sm">{saveError}</p>
+              </div>
+            )}
 
             {/* Help Text */}
             <p className="text-sm text-muted-foreground text-center">
