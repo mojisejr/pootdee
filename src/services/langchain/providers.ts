@@ -44,6 +44,11 @@ export class AIProviderManager {
         throw new Error('GOOGLE_AI_API_KEY environment variable is required');
       }
 
+      // Set GOOGLE_API_KEY for the library if not already set
+      if (!process.env.GOOGLE_API_KEY) {
+        process.env.GOOGLE_API_KEY = process.env.GOOGLE_AI_API_KEY;
+      }
+
       this.model = new ChatGoogleGenerativeAI({
         apiKey: process.env.GOOGLE_AI_API_KEY,
         model: "gemini-1.5-flash",

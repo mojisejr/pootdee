@@ -21,6 +21,23 @@ export interface WorkflowState {
   // Workflow control
   currentStep: "filter" | "analyze" | "complete" | "error";
   errorDetails?: ErrorDetails;
+
+  // Enhanced metadata
+  metadata?: AnalysisMetadata;
+}
+
+// ============================================================================
+// Enhanced Analysis Metadata Interface
+// ============================================================================
+
+export interface AnalysisMetadata {
+  timestamp: string;
+  processingTimeMs: number;
+  modelUsed: string;
+  confidence: number;
+  retryCount: number;
+  version: string;
+  sessionId?: string;
 }
 
 // ============================================================================
@@ -38,10 +55,16 @@ export interface SentenceFilterOutput {
   reason: string;
   cleanedSentence: string | null;
   confidence: number;
+  metadata?: {
+    detectedLanguage: string;
+    wordCount: number;
+    sentenceCount: number;
+    complexity: "simple" | "medium" | "complex";
+  };
 }
 
 // ============================================================================
-// Analyzer Agent Interfaces
+// Enhanced Analyzer Agent Interfaces
 // ============================================================================
 
 export interface AnalyzerInput {
@@ -55,12 +78,60 @@ export interface AnalyzerOutput {
   meaning: string;
   alternatives: string[];
   errors: string;
+  
+  // Enhanced analysis fields
+  grammarAnalysis: GrammarAnalysis;
+  vocabularyAnalysis: VocabularyAnalysis;
+  contextAnalysis: ContextAnalysis;
+  confidence: number;
+  suggestions: string[];
+}
+
+export interface GrammarAnalysis {
+  score: number; // 0-100
+  issues: GrammarIssue[];
+  strengths: string[];
+  recommendations: string[];
+}
+
+export interface GrammarIssue {
+  type: "tense" | "subject_verb_agreement" | "article" | "preposition" | "word_order" | "other";
+  description: string;
+  severity: "low" | "medium" | "high";
+  suggestion: string;
+  position?: {
+    start: number;
+    end: number;
+  };
+}
+
+export interface VocabularyAnalysis {
+  score: number; // 0-100
+  level: "beginner" | "intermediate" | "advanced";
+  appropriateWords: string[];
+  inappropriateWords: string[];
+  suggestions: VocabularySuggestion[];
+}
+
+export interface VocabularySuggestion {
+  original: string;
+  suggested: string;
+  reason: string;
+  context: string;
+}
+
+export interface ContextAnalysis {
+  score: number; // 0-100
+  appropriateness: "formal" | "informal" | "neutral";
+  culturalNotes: string[];
+  usageNotes: string[];
+  situationalFit: string;
 }
 
 export type AnalysisResult = AnalyzerOutput;
 
 // ============================================================================
-// Error Handling Interfaces
+// Enhanced Error Handling Interfaces
 // ============================================================================
 
 export enum ErrorType {
@@ -69,6 +140,8 @@ export enum ErrorType {
   API_RATE_LIMIT = "api_rate_limit",
   API_ERROR = "api_error",
   NETWORK_ERROR = "network_error",
+  PARSING_ERROR = "parsing_error",
+  STRUCTURED_OUTPUT_ERROR = "structured_output_error",
   UNKNOWN = "unknown",
 }
 
@@ -79,6 +152,9 @@ export interface ErrorDetails {
   userMessage: string;
   retryable?: boolean;
   suggestedAction?: string;
+  timestamp: string;
+  errorCode?: string;
+  context?: Record<string, unknown>;
 }
 
 export interface WorkflowError {
@@ -88,6 +164,9 @@ export interface WorkflowError {
   userMessage: string;
   retryable: boolean;
   suggestedAction?: string;
+  timestamp: string;
+  errorCode?: string;
+  context?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -98,22 +177,31 @@ export interface AnalyzeRequest {
   englishPhrase: string;
   userTranslation?: string;
   context?: string;
+  options?: {
+    includeMetadata?: boolean;
+    detailedAnalysis?: boolean;
+    sessionId?: string;
+  };
 }
 
 export interface AnalyzeResponse {
   success: boolean;
   data?: AnalysisResult;
+  metadata?: AnalysisMetadata;
   error?: {
     type: ErrorType;
     message: string;
     userMessage: string;
     retryable: boolean;
     suggestedAction?: string;
+    timestamp: string;
+    errorCode?: string;
+    context?: Record<string, unknown>;
   };
 }
 
 // ============================================================================
-// LangGraph State Management
+// LangGraph State Interface (Enhanced)
 // ============================================================================
 
 export interface LangGraphState {
@@ -123,14 +211,17 @@ export interface LangGraphState {
   filterResult?: {
     isValid: boolean;
     reasoning: string;
+    metadata?: SentenceFilterOutput['metadata'];
   };
   analysisResult?: {
     grammar: AnalysisSection;
     usage: AnalysisSection;
     context: AnalysisSection;
+    enhanced?: AnalyzerOutput;
   };
   errors?: string[];
   retryCount: number;
+  metadata?: AnalysisMetadata;
 }
 
 export interface AnalysisSection {
@@ -140,10 +231,65 @@ export interface AnalysisSection {
 }
 
 // ============================================================================
-// Zod Validation Schemas
+// Enhanced Zod Schemas for Structured Output
 // ============================================================================
 
-// Sentence Filter Schemas
+// Grammar Analysis Schemas
+export const GrammarIssueSchema = z.object({
+  type: z.enum(["tense", "subject_verb_agreement", "article", "preposition", "word_order", "other"]),
+  description: z.string(),
+  severity: z.enum(["low", "medium", "high"]),
+  suggestion: z.string(),
+  position: z.object({
+    start: z.number(),
+    end: z.number(),
+  }).optional(),
+});
+
+export const GrammarAnalysisSchema = z.object({
+  score: z.number().min(0).max(100),
+  issues: z.array(GrammarIssueSchema),
+  strengths: z.array(z.string()),
+  recommendations: z.array(z.string()),
+});
+
+// Vocabulary Analysis Schemas
+export const VocabularySuggestionSchema = z.object({
+  original: z.string(),
+  suggested: z.string(),
+  reason: z.string(),
+  context: z.string(),
+});
+
+export const VocabularyAnalysisSchema = z.object({
+  score: z.number().min(0).max(100),
+  level: z.enum(["beginner", "intermediate", "advanced"]),
+  appropriateWords: z.array(z.string()),
+  inappropriateWords: z.array(z.string()),
+  suggestions: z.array(VocabularySuggestionSchema),
+});
+
+// Context Analysis Schema
+export const ContextAnalysisSchema = z.object({
+  score: z.number().min(0).max(100),
+  appropriateness: z.enum(["formal", "informal", "neutral"]),
+  culturalNotes: z.array(z.string()),
+  usageNotes: z.array(z.string()),
+  situationalFit: z.string(),
+});
+
+// Enhanced Metadata Schema
+export const AnalysisMetadataSchema = z.object({
+  timestamp: z.string(),
+  processingTimeMs: z.number(),
+  modelUsed: z.string(),
+  confidence: z.number().min(0).max(1),
+  retryCount: z.number(),
+  version: z.string(),
+  sessionId: z.string().optional(),
+});
+
+// Enhanced Filter Schemas
 export const SentenceFilterInputSchema = z.object({
   englishPhrase: z.string().min(1, "English phrase is required"),
   userTranslation: z.string().optional(),
@@ -155,9 +301,15 @@ export const SentenceFilterOutputSchema = z.object({
   reason: z.string(),
   cleanedSentence: z.string().nullable(),
   confidence: z.number().min(0).max(1),
+  metadata: z.object({
+    detectedLanguage: z.string(),
+    wordCount: z.number(),
+    sentenceCount: z.number(),
+    complexity: z.enum(["simple", "medium", "complex"]),
+  }).optional(),
 });
 
-// Analyzer Schemas
+// Enhanced Analyzer Schemas
 export const AnalyzerInputSchema = z.object({
   sentence: z.string().min(1, "Sentence is required"),
   userTranslation: z.string().optional(),
@@ -169,28 +321,42 @@ export const AnalyzerOutputSchema = z.object({
   meaning: z.string(),
   alternatives: z.array(z.string()),
   errors: z.string(),
+  grammarAnalysis: GrammarAnalysisSchema,
+  vocabularyAnalysis: VocabularyAnalysisSchema,
+  contextAnalysis: ContextAnalysisSchema,
+  confidence: z.number().min(0).max(1),
+  suggestions: z.array(z.string()),
 });
 
-// API Request/Response Schemas
+// Enhanced Request/Response Schemas
 export const AnalyzeRequestSchema = z.object({
   englishPhrase: z.string().min(1, "English phrase is required").max(500, "Phrase too long"),
   userTranslation: z.string().optional(),
   context: z.string().optional(),
+  options: z.object({
+    includeMetadata: z.boolean().optional(),
+    detailedAnalysis: z.boolean().optional(),
+    sessionId: z.string().optional(),
+  }).optional(),
 });
 
 export const AnalyzeResponseSchema = z.object({
   success: z.boolean(),
   data: AnalyzerOutputSchema.optional(),
+  metadata: AnalysisMetadataSchema.optional(),
   error: z.object({
     type: z.nativeEnum(ErrorType),
     message: z.string(),
     userMessage: z.string(),
     retryable: z.boolean(),
     suggestedAction: z.string().optional(),
+    timestamp: z.string(),
+    errorCode: z.string().optional(),
+    context: z.record(z.string(), z.unknown()).optional(),
   }).optional(),
 });
 
-// Error Details Schema
+// Enhanced Error Schemas
 export const ErrorDetailsSchema = z.object({
   step: z.enum(["filter", "analyze"]),
   type: z.nativeEnum(ErrorType),
@@ -198,9 +364,12 @@ export const ErrorDetailsSchema = z.object({
   userMessage: z.string(),
   retryable: z.boolean().optional(),
   suggestedAction: z.string().optional(),
+  timestamp: z.string(),
+  errorCode: z.string().optional(),
+  context: z.record(z.string(), z.unknown()).optional(),
 });
 
-// Workflow State Schema
+// Enhanced Workflow State Schema
 export const WorkflowStateSchema = z.object({
   englishPhrase: z.string(),
   userTranslation: z.string().optional(),
@@ -211,10 +380,11 @@ export const WorkflowStateSchema = z.object({
   analysisError: z.string().optional(),
   currentStep: z.enum(["filter", "analyze", "complete", "error"]),
   errorDetails: ErrorDetailsSchema.optional(),
+  metadata: AnalysisMetadataSchema.optional(),
 });
 
 // ============================================================================
-// Error Messages for UI
+// Enhanced Error Messages with Structured Output Context
 // ============================================================================
 
 export const ERROR_MESSAGES: Record<ErrorType, {
@@ -247,6 +417,16 @@ export const ERROR_MESSAGES: Record<ErrorType, {
     description: "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ต",
     action: "ตรวจสอบเน็ต",
   },
+  [ErrorType.PARSING_ERROR]: {
+    title: "เกิดข้อผิดพลาดในการประมวลผล",
+    description: "ไม่สามารถประมวลผลข้อมูลที่ได้รับจาก AI ได้ กรุณาลองใหม่อีกครั้ง",
+    action: "ลองใหม่",
+  },
+  [ErrorType.STRUCTURED_OUTPUT_ERROR]: {
+    title: "เกิดข้อผิดพลาดในรูปแบบข้อมูล",
+    description: "ข้อมูลที่ได้รับจาก AI ไม่ตรงตามรูปแบบที่คาดหวัง กรุณาลองใหม่อีกครั้ง",
+    action: "ลองใหม่",
+  },
   [ErrorType.UNKNOWN]: {
     title: "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ",
     description: "เกิดปัญหาที่ไม่คาดคิด กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ",
@@ -255,7 +435,7 @@ export const ERROR_MESSAGES: Record<ErrorType, {
 };
 
 // ============================================================================
-// Type Guards
+// Enhanced Type Guards with Structured Output Validation
 // ============================================================================
 
 export function isValidSentenceFilterOutput(obj: unknown): obj is SentenceFilterOutput {
@@ -271,45 +451,159 @@ export function isValidAnalyzeRequest(obj: unknown): obj is AnalyzeRequest {
 }
 
 export function isValidWorkflowState(obj: unknown): obj is WorkflowState {
-  return (
-    typeof obj === 'object' &&
-    obj !== null &&
-    'input' in obj &&
-    typeof obj.input === 'object' &&
-    obj.input !== null &&
-    'sentence' in obj.input &&
-    typeof obj.input.sentence === 'string' &&
-    ('filterResult' in obj && (obj.filterResult === null || isValidSentenceFilterOutput(obj.filterResult))) &&
-    ('analysisResult' in obj && (obj.analysisResult === null || isValidAnalyzerOutput(obj.analysisResult))) &&
-    ('error' in obj && (obj.error === null || typeof obj.error === 'object')) &&
-    'isComplete' in obj &&
-    typeof obj.isComplete === 'boolean'
-  );
+  return WorkflowStateSchema.safeParse(obj).success;
 }
 
 export function isValidAnalysisResult(obj: unknown): obj is AnalysisResult {
-  return (
-    typeof obj === 'object' &&
-    obj !== null &&
-    'success' in obj &&
-    typeof obj.success === 'boolean' &&
-    ('error' in obj && (obj.error === null || typeof obj.error === 'object')) &&
-    ('filterResult' in obj && (obj.filterResult === null || isValidSentenceFilterOutput(obj.filterResult))) &&
-    ('analysisResult' in obj && (obj.analysisResult === null || isValidAnalyzerOutput(obj.analysisResult)))
-  );
+  return AnalyzerOutputSchema.safeParse(obj).success;
+}
+
+export function isValidAnalysisMetadata(obj: unknown): obj is AnalysisMetadata {
+  return AnalysisMetadataSchema.safeParse(obj).success;
+}
+
+export function isValidGrammarAnalysis(obj: unknown): obj is GrammarAnalysis {
+  return GrammarAnalysisSchema.safeParse(obj).success;
+}
+
+export function isValidVocabularyAnalysis(obj: unknown): obj is VocabularyAnalysis {
+  return VocabularyAnalysisSchema.safeParse(obj).success;
+}
+
+export function isValidContextAnalysis(obj: unknown): obj is ContextAnalysis {
+  return ContextAnalysisSchema.safeParse(obj).success;
 }
 
 // ============================================================================
-// Utility Types
+// Enhanced Utility Functions for Structured Output
 // ============================================================================
 
-export type NodeFunction<T = WorkflowState> = (state: T) => Promise<T>;
-export type ConditionalEdgeFunction<T = WorkflowState> = (state: T) => string;
+/**
+ * Validates and parses structured output from LLM
+ */
+export function parseStructuredOutput<T>(
+  schema: z.ZodSchema<T>,
+  data: unknown,
+  context?: string
+): { success: true; data: T } | { success: false; error: ErrorDetails } {
+  try {
+    const result = schema.safeParse(data);
+    
+    if (result.success) {
+      return { success: true, data: result.data };
+    } else {
+      const errorMessage = result.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      
+      return {
+        success: false,
+        error: {
+          step: "analyze",
+          type: ErrorType.STRUCTURED_OUTPUT_ERROR,
+          message: `Structured output validation failed: ${errorMessage}`,
+          userMessage: "เกิดข้อผิดพลาดในการประมวลผลข้อมูล กรุณาลองใหม่อีกครั้ง",
+          retryable: true,
+          suggestedAction: "ลองใหม่",
+          timestamp: new Date().toISOString(),
+          errorCode: "STRUCT_VALIDATION_FAILED",
+          context: { originalData: data, validationErrors: result.error.issues, context },
+        },
+      };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        step: "analyze",
+        type: ErrorType.PARSING_ERROR,
+        message: `Failed to parse structured output: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        userMessage: "เกิดข้อผิดพลาดในการประมวลผลข้อมูล กรุณาลองใหม่อีกครั้ง",
+        retryable: true,
+        suggestedAction: "ลองใหม่",
+        timestamp: new Date().toISOString(),
+        errorCode: "STRUCT_PARSE_FAILED",
+        context: { originalData: data, error: error instanceof Error ? error.message : 'Unknown error', context },
+      },
+    };
+  }
+}
 
-// Provider configuration
+/**
+ * Creates analysis metadata with current timestamp and processing info
+ */
+export function createAnalysisMetadata(
+  modelUsed: string,
+  processingTimeMs: number,
+  confidence: number,
+  retryCount: number = 0,
+  sessionId?: string
+): AnalysisMetadata {
+  return {
+    timestamp: new Date().toISOString(),
+    processingTimeMs,
+    modelUsed,
+    confidence,
+    retryCount,
+    version: "1.0.0",
+    sessionId,
+  };
+}
+
+/**
+ * Creates error details with proper timestamp and context
+ */
+export function createErrorDetails(
+  step: "filter" | "analyze",
+  type: ErrorType,
+  message: string,
+  userMessage: string,
+  retryable: boolean = true,
+  suggestedAction?: string,
+  errorCode?: string,
+  context?: Record<string, unknown>
+): ErrorDetails {
+  return {
+    step,
+    type,
+    message,
+    userMessage,
+    retryable,
+    suggestedAction,
+    timestamp: new Date().toISOString(),
+    errorCode,
+    context,
+  };
+}
+
+// ============================================================================
+// Provider Configuration Interface
+// ============================================================================
+
 export interface ProviderConfig {
   primary: "google";
   fallback?: "google";
   timeout: number;
   maxRetries: number;
+  structuredOutput?: {
+    enabled: boolean;
+    retryOnValidationError: boolean;
+    maxValidationRetries: number;
+  };
 }
+
+// ============================================================================
+// Logging Configuration Interface
+// ============================================================================
+
+export interface LoggingConfig {
+  level: "DEBUG" | "INFO" | "ERROR";
+  enableStructuredLogs: boolean;
+  includeMetadata: boolean;
+  includeContext: boolean;
+}
+
+// ============================================================================
+// Type Definitions for LangChain Integration
+// ============================================================================
+
+export type NodeFunction<T = WorkflowState> = (state: T) => Promise<T>;
+export type ConditionalEdgeFunction<T = WorkflowState> = (state: T) => string;

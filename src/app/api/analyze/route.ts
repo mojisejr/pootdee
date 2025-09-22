@@ -1,136 +1,109 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { 
+  englishAnalysisWorkflow,
+  WorkflowHealthStatus,
+  WorkflowConfig
+} from '../../../services/langchain/workflow';
+import { 
   AnalyzeRequest, 
   AnalyzeResponse, 
-  AnalyzeRequestSchema, 
   ErrorType, 
-  ERROR_MESSAGES 
-} from '@/interfaces/langchain';
-import { englishAnalysisWorkflow } from '@/services/langchain';
+  createErrorDetails
+} from '../../../interfaces/langchain';
+import { createLogger } from '../../../lib/logger';
+
+const logger = createLogger('AnalyzeAPI');
 
 /**
  * POST /api/analyze
- * Analyzes English sentences using the LangGraph workflow
- * 
- * @param request - NextRequest containing the English phrase and optional translation/context
- * @returns NextResponse with analysis results or error details
+ * Analyzes English phrases for grammar, vocabulary, and context
  */
 export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeResponse>> {
   try {
-    console.log('INFO: Analyze API endpoint called');
+    logger.info('Analysis request received');
     
-    // Parse and validate request body
     const body = await request.json();
-    console.log('DEBUG: Request body received:', {
-      hasPhrase: !!body.englishPhrase,
-      hasTranslation: !!body.userTranslation,
-      hasContext: !!body.context,
-      phraseLength: body.englishPhrase?.length || 0
-    });
+    const { englishPhrase, userTranslation, context, options } = body as AnalyzeRequest;
 
-    // Validate input using Zod schema
-    const validationResult = AnalyzeRequestSchema.safeParse(body);
-    if (!validationResult.success) {
-      console.log('ERROR: Request validation failed:', validationResult.error.issues);
-      
-      const response: AnalyzeResponse = {
+    // Validate required fields
+    if (!englishPhrase || typeof englishPhrase !== 'string' || englishPhrase.trim().length === 0) {
+      const errorDetails = createErrorDetails(
+        "filter",
+        ErrorType.VALIDATION,
+        "English phrase is required and must be a non-empty string",
+        "กรุณากรอกประโยคภาษาอังกฤษ",
+        false,
+        "กรอกประโยคภาษาอังกฤษที่ต้องการวิเคราะห์"
+      );
+
+      return NextResponse.json({
         success: false,
         error: {
-          type: ErrorType.VALIDATION,
-          message: 'Invalid request data',
-          userMessage: ERROR_MESSAGES[ErrorType.VALIDATION].description,
-          retryable: false,
-          suggestedAction: ERROR_MESSAGES[ErrorType.VALIDATION].action,
-        },
-      };
-      
-      return NextResponse.json(response, { status: 400 });
+          ...errorDetails,
+          retryable: errorDetails.retryable || false
+        }
+      }, { status: 400 });
     }
 
-    const analyzeRequest: AnalyzeRequest = validationResult.data;
-
-    // Execute the workflow
-    console.log('INFO: Starting workflow execution');
-    const startTime = Date.now();
-    
-    const result = await englishAnalysisWorkflow.execute(analyzeRequest);
-    
-    const executionTime = Date.now() - startTime;
-    console.log('INFO: Workflow execution completed:', {
-      success: result.success,
-      executionTimeMs: executionTime,
-      hasData: !!result.data,
-      hasError: !!result.error
+    // Execute analysis workflow
+    logger.info('Starting analysis workflow', { 
+      metadata: {
+        hasTranslation: !!userTranslation,
+        hasContext: !!context
+      }
     });
 
-    // Return successful response
-    if (result.success && result.data) {
-      console.log('INFO: Analysis successful:', {
-        correctness: result.data.correctness,
-        alternativesCount: result.data.alternatives.length,
-        hasErrors: !!result.data.errors
-      });
-      
-      return NextResponse.json(result, { status: 200 });
-    }
+    const startTime = Date.now();
+    const result = await englishAnalysisWorkflow.execute(
+      englishPhrase,
+      userTranslation || '',
+      context,
+      options?.sessionId
+    );
+    const processingTime = Date.now() - startTime;
 
-    // Return error response
-    if (result.error) {
-      console.log('ERROR: Analysis failed:', {
-        type: result.error.type,
-        message: result.error.message,
-        retryable: result.error.retryable
-      });
-      
-      const statusCode = getStatusCodeForError(result.error.type);
-      return NextResponse.json(result, { status: statusCode });
-    }
+    logger.info('Analysis completed successfully', {
+      metadata: {
+        correctness: result.correctness,
+        confidence: result.confidence
+      }
+    });
 
-    // Fallback error case
-    console.error('ERROR: Unexpected workflow result state');
-    const fallbackResponse: AnalyzeResponse = {
-      success: false,
-      error: {
-        type: ErrorType.UNKNOWN,
-        message: 'Unexpected workflow result',
-        userMessage: ERROR_MESSAGES[ErrorType.UNKNOWN].description,
-        retryable: true,
-        suggestedAction: ERROR_MESSAGES[ErrorType.UNKNOWN].action,
-      },
+    const response: AnalyzeResponse = {
+      success: true,
+      data: result,
+      metadata: options?.includeMetadata ? {
+        timestamp: new Date().toISOString(),
+        processingTimeMs: processingTime,
+        modelUsed: 'gemini-2.5-flash',
+        confidence: result.confidence,
+        retryCount: 0,
+        version: '1.0.0',
+        sessionId: options?.sessionId
+      } : undefined
     };
-    
-    return NextResponse.json(fallbackResponse, { status: 500 });
+
+    return NextResponse.json(response);
 
   } catch (error) {
-    console.error('ERROR: API endpoint exception:', error);
-    
-    // Handle different types of errors
-    let errorType = ErrorType.UNKNOWN;
-    let statusCode = 500;
-    
-    if (error instanceof SyntaxError) {
-      errorType = ErrorType.VALIDATION;
-      statusCode = 400;
-    } else if (error instanceof Error && error.message.includes('timeout')) {
-      errorType = ErrorType.API_TIMEOUT;
-      statusCode = 408;
-    } else if (error instanceof Error && error.message.includes('rate limit')) {
-      errorType = ErrorType.API_RATE_LIMIT;
-      statusCode = 429;
-    }
+    logger.error('Analysis failed', error instanceof Error ? error : undefined);
 
-    const errorResponse: AnalyzeResponse = {
+    const errorDetails = createErrorDetails(
+      "analyze",
+      ErrorType.UNKNOWN,
+      error instanceof Error ? error.message : 'Unknown error occurred',
+      "เกิดข้อผิดพลาดในการวิเคราะห์ กรุณาลองใหม่อีกครั้ง",
+      true,
+      "ลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบหากปัญหายังคงอยู่"
+    );
+
+    return NextResponse.json({
       success: false,
       error: {
-        type: errorType,
-        message: error instanceof Error ? error.message : 'Unknown error occurred',
-        userMessage: ERROR_MESSAGES[errorType].description,
-        retryable: errorType !== ErrorType.VALIDATION,
-        suggestedAction: ERROR_MESSAGES[errorType].action,
-      },
-    };
-
-    return NextResponse.json(errorResponse, { status: statusCode });
+        ...errorDetails,
+        retryable: errorDetails.retryable || false
+      }
+    }, { status: getStatusCodeForError(errorDetails.type) });
   }
 }
 
@@ -138,49 +111,55 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
  * GET /api/analyze
  * Health check endpoint for the analyze service
  */
-export async function GET(): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse<{ status: string; timestamp: string; health: WorkflowHealthStatus; config: WorkflowConfig }>> {
   try {
-    console.log('INFO: Health check endpoint called');
-    
-    const healthStatus = await englishAnalysisWorkflow.healthCheck();
+    const health = await englishAnalysisWorkflow.healthCheck();
     const config = englishAnalysisWorkflow.getConfig();
     
-    const response = {
-      status: healthStatus.status,
-      timestamp: new Date().toISOString(),
-      service: 'English Analysis API',
-      version: config.version,
-      details: healthStatus.details,
-      config: {
-        supportedLanguages: config.supportedLanguages,
-        steps: config.steps,
-      },
-    };
-    
-    const statusCode = healthStatus.status === 'healthy' ? 200 : 503;
-    console.log('INFO: Health check completed:', {
-      status: healthStatus.status,
-      statusCode
+    return NextResponse.json({
+      status: 'healthy',
+      timestamp: health.details.lastCheck,
+      health,
+      config
     });
-    
-    return NextResponse.json(response, { status: statusCode });
-    
   } catch (error) {
-    console.error('ERROR: Health check failed:', error);
+    logger.error('Health check failed', error instanceof Error ? error : undefined);
     
-    const errorResponse = {
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      service: 'English Analysis API',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
-    
-    return NextResponse.json(errorResponse, { status: 503 });
+    return NextResponse.json(
+      { 
+        status: 'unhealthy', 
+        timestamp: new Date().toISOString(),
+        health: {
+          isHealthy: false,
+          status: 'unhealthy',
+          details: {
+            components: {
+              analyzer: {
+                isHealthy: false,
+                lastCheck: new Date().toISOString(),
+                error: error instanceof Error ? error.message : 'Unknown error'
+              },
+              workflow: {
+                isHealthy: false,
+                lastCheck: new Date().toISOString(),
+                version: '1.0.0',
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
+            },
+            lastCheck: new Date().toISOString(),
+            version: '1.0.0',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }
+        },
+        config: englishAnalysisWorkflow.getConfig()
+      },
+      { status: 500 }
+    );
   }
 }
 
 /**
- * Helper function to map error types to HTTP status codes
+ * Maps error types to appropriate HTTP status codes
  */
 function getStatusCodeForError(errorType: ErrorType): number {
   switch (errorType) {
@@ -190,10 +169,6 @@ function getStatusCodeForError(errorType: ErrorType): number {
       return 408;
     case ErrorType.API_RATE_LIMIT:
       return 429;
-    case ErrorType.API_ERROR:
-      return 502;
-    case ErrorType.NETWORK_ERROR:
-      return 503;
     case ErrorType.UNKNOWN:
     default:
       return 500;
