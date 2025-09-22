@@ -69,18 +69,19 @@ describe('EnglishAnalysisWorkflow', () => {
       // Note: We're not testing the full execution here to avoid API calls
       expect(() => {
         // Just verify the input structure is accepted
-        const result = workflow.execute(validInput);
+        const result = workflow.execute(validInput.englishPhrase, validInput.userTranslation!, validInput.context);
         expect(result).toBeInstanceOf(Promise);
       }).not.toThrow();
     });
 
     it('should handle minimal valid input', () => {
       const minimalInput: AnalyzeRequest = {
-        englishPhrase: "Test sentence"
+        englishPhrase: "Test sentence",
+        userTranslation: "ประโยคทดสอบ"
       };
 
       expect(() => {
-        const result = workflow.execute(minimalInput);
+        const result = workflow.execute(minimalInput.englishPhrase, minimalInput.userTranslation!);
         expect(result).toBeInstanceOf(Promise);
       }).not.toThrow();
     });

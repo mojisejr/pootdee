@@ -118,7 +118,7 @@ export async function GET(): Promise<NextResponse<{ status: string; timestamp: s
     
     return NextResponse.json({
       status: 'healthy',
-      timestamp: health.lastCheck,
+      timestamp: health.details.lastCheck,
       health,
       config
     });
@@ -131,22 +131,25 @@ export async function GET(): Promise<NextResponse<{ status: string; timestamp: s
         timestamp: new Date().toISOString(),
         health: {
           isHealthy: false,
-          components: {
-            analyzer: {
-              isHealthy: false,
-              lastCheck: new Date().toISOString(),
-              error: error instanceof Error ? error.message : 'Unknown error'
+          status: 'unhealthy',
+          details: {
+            components: {
+              analyzer: {
+                isHealthy: false,
+                lastCheck: new Date().toISOString(),
+                error: error instanceof Error ? error.message : 'Unknown error'
+              },
+              workflow: {
+                isHealthy: false,
+                lastCheck: new Date().toISOString(),
+                version: '1.0.0',
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }
             },
-            workflow: {
-              isHealthy: false,
-              lastCheck: new Date().toISOString(),
-              version: '1.0.0',
-              error: error instanceof Error ? error.message : 'Unknown error'
-            }
-          },
-          lastCheck: new Date().toISOString(),
-          version: '1.0.0',
-          error: error instanceof Error ? error.message : 'Unknown error'
+            lastCheck: new Date().toISOString(),
+            version: '1.0.0',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          }
         },
         config: englishAnalysisWorkflow.getConfig()
       },

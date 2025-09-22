@@ -352,7 +352,7 @@ export const AnalyzeResponseSchema = z.object({
     suggestedAction: z.string().optional(),
     timestamp: z.string(),
     errorCode: z.string().optional(),
-    context: z.record(z.unknown()).optional(),
+    context: z.record(z.string(), z.unknown()).optional(),
   }).optional(),
 });
 
@@ -366,7 +366,7 @@ export const ErrorDetailsSchema = z.object({
   suggestedAction: z.string().optional(),
   timestamp: z.string(),
   errorCode: z.string().optional(),
-  context: z.record(z.unknown()).optional(),
+  context: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Enhanced Workflow State Schema
@@ -575,13 +575,6 @@ export function createErrorDetails(
 }
 
 // ============================================================================
-// Type Definitions for LangChain Integration
-// ============================================================================
-
-export type NodeFunction<T = WorkflowState> = (state: T) => Promise<T>;
-export type ConditionalEdgeFunction<T = WorkflowState> = (state: T) => string;
-
-// ============================================================================
 // Provider Configuration Interface
 // ============================================================================
 
@@ -609,28 +602,8 @@ export interface LoggingConfig {
 }
 
 // ============================================================================
-// Export Types for External Use
+// Type Definitions for LangChain Integration
 // ============================================================================
 
-export type {
-  WorkflowState,
-  AnalysisMetadata,
-  SentenceFilterInput,
-  SentenceFilterOutput,
-  AnalyzerInput,
-  AnalyzerOutput,
-  GrammarAnalysis,
-  GrammarIssue,
-  VocabularyAnalysis,
-  VocabularySuggestion,
-  ContextAnalysis,
-  AnalysisResult,
-  ErrorDetails,
-  WorkflowError,
-  AnalyzeRequest,
-  AnalyzeResponse,
-  LangGraphState,
-  AnalysisSection,
-  ProviderConfig,
-  LoggingConfig,
-};
+export type NodeFunction<T = WorkflowState> = (state: T) => Promise<T>;
+export type ConditionalEdgeFunction<T = WorkflowState> = (state: T) => string;

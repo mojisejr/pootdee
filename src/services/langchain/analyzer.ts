@@ -60,8 +60,14 @@ class AnalyzerAgent {
     logger.info("Initializing AnalyzerAgent with structured output support");
 
     try {
+      // Set GOOGLE_API_KEY for the library if not already set
+      if (!process.env.GOOGLE_API_KEY && process.env.GOOGLE_AI_API_KEY) {
+        process.env.GOOGLE_API_KEY = process.env.GOOGLE_AI_API_KEY;
+      }
+
       this.model = new ChatGoogleGenerativeAI({
-        model: "gemini-2.5-flash",
+        apiKey: process.env.GOOGLE_AI_API_KEY,
+        model: "gemini-1.5-flash",
         temperature: 0.3,
         maxOutputTokens: 2048,
       });

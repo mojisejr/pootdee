@@ -34,23 +34,26 @@ export interface WorkflowConfig {
 
 export interface WorkflowHealthStatus {
   isHealthy: boolean;
-  components: {
-    analyzer: {
-      isHealthy: boolean;
-      lastCheck: string;
-      version?: string;
-      error?: string;
+  status: string;
+  details: {
+    components: {
+      analyzer: {
+        isHealthy: boolean;
+        lastCheck: string;
+        version?: string;
+        error?: string;
+      };
+      workflow: {
+        isHealthy: boolean;
+        lastCheck: string;
+        version: string;
+        error?: string;
+      };
     };
-    workflow: {
-      isHealthy: boolean;
-      lastCheck: string;
-      version: string;
-      error?: string;
-    };
+    lastCheck: string;
+    version: string;
+    error?: string;
   };
-  lastCheck: string;
-  version: string;
-  error?: string;
 }
 
 export interface EnhancedWorkflowState extends WorkflowState {
@@ -431,20 +434,23 @@ export class EnglishAnalysisWorkflow {
       
       const status: WorkflowHealthStatus = {
         isHealthy: analyzerHealthy,
-        components: {
-          analyzer: {
-            isHealthy: analyzerHealthy,
-            lastCheck: new Date().toISOString(),
-            version: '2.0.0'
+        status: analyzerHealthy ? 'healthy' : 'unhealthy',
+        details: {
+          components: {
+            analyzer: {
+              isHealthy: analyzerHealthy,
+              lastCheck: new Date().toISOString(),
+              version: '2.0.0'
+            },
+            workflow: {
+              isHealthy: true,
+              lastCheck: new Date().toISOString(),
+              version: '2.0.0'
+            }
           },
-          workflow: {
-            isHealthy: true,
-            lastCheck: new Date().toISOString(),
-            version: '2.0.0'
-          }
-        },
-        lastCheck: new Date().toISOString(),
-        version: '2.0.0'
+          lastCheck: new Date().toISOString(),
+          version: '2.0.0'
+        }
       };
 
       logger.info('Health check completed', {
@@ -452,7 +458,7 @@ export class EnglishAnalysisWorkflow {
         action: 'healthCheck',
         metadata: {
           isHealthy: status.isHealthy,
-          version: status.version
+          version: status.details.version
         }
       });
 
@@ -468,22 +474,25 @@ export class EnglishAnalysisWorkflow {
 
       return {
         isHealthy: false,
-        components: {
-          analyzer: {
-            isHealthy: false,
-            lastCheck: new Date().toISOString(),
-            error: errorMessage
+        status: 'unhealthy',
+        details: {
+          components: {
+            analyzer: {
+              isHealthy: false,
+              lastCheck: new Date().toISOString(),
+              error: errorMessage
+            },
+            workflow: {
+              isHealthy: false,
+              lastCheck: new Date().toISOString(),
+              version: '2.0.0',
+              error: errorMessage
+            }
           },
-          workflow: {
-            isHealthy: false,
-            lastCheck: new Date().toISOString(),
-            version: '2.0.0',
-            error: errorMessage
-          }
-        },
-        lastCheck: new Date().toISOString(),
-        version: '2.0.0',
-        error: errorMessage
+          lastCheck: new Date().toISOString(),
+          version: '2.0.0',
+          error: errorMessage
+        }
       };
     }
   }
