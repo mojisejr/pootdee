@@ -1,8 +1,6 @@
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { z } from "zod";
 import {
-  AnalysisResult,
   AnalyzerInput,
   AnalyzerOutput,
   AnalyzerInputSchema,
@@ -10,7 +8,6 @@ import {
   AnalysisMetadata,
   parseStructuredOutput,
   createAnalysisMetadata,
-  isValidAnalyzerOutput,
 } from "../../interfaces/langchain";
 import { createLogger } from "../../lib/logger";
 
@@ -123,7 +120,7 @@ class AnalyzerAgent {
       // ---
 
       this.promptTemplate = ChatPromptTemplate.fromTemplate(`
-        คุณเป็นผู้ช่วยตรวจประโยคอังกฤษสำหรับคนไทย เน้น "สั้น ชัด ตรง ใช้ได้ทันที".
+        คุณเป็นผู้ช่วยวิเคราะห์ประโยคอังกฤษสำหรับคนไทย ให้คำอธิบายแบบเป็นกันเอง เข้าใจง่าย และใช้ได้จริง
 
         อินพุต:
         - ประโยค: {sentence}
@@ -131,38 +128,50 @@ class AnalyzerAgent {
         - คำแปลผู้ใช้: {userTranslation}
 
         ข้อกำหนดการตอบ:
-        - ตอบเป็น JSON ตาม schema เท่านั้น (ไม่มีข้อความอื่น).
-        - ภาษาไทยง่ายๆ ไม่ร่ายยาว ไม่กำกวม.
-        - ทุกหัวข้อให้คำตอบสั้นที่สุดที่ยังชัดเจน.
+        - ตอบเป็น JSON ตาม schema เท่านั้น (ไม่มีข้อความอื่น)
+        - อธิบายเป็นภาษาไทยแบบเป็นกันเอง เหมือนเพื่อนคุยกัน
+        - ให้กำลังใจและช่วยให้เข้าใจ ไม่ใช่แค่ชี้ผิด
+        - สำหรับ technical terms ใช้ภาษาอังกฤษตามปกติ
 
-        Schema และข้อกำหนดความสั้น:
+        Schema และข้อกำหนด:
         1. correctness: "correct" | "incorrect" | "partially_correct"
-        2. meaning: สรุปความหมาย 1 ประโยค; ถ้ามี {userTranslation} ให้บอกว่า "แปลถูก/ผิด" และให้คำแปลที่ถูกต้องสั้นๆ
-        3. alternatives: 2-3 ตัวอย่างที่ใช้ได้จริง (แต่ละรายการ ≤ 1 ประโยค)
-        4. errors: จุดผิดหลักๆ 1-2 ประเด็น พร้อมวิธีแก้แบบสั้น (string)
+        2. meaning: ความหมายของประโยค ถ้ามี userTranslation ให้เปรียบเทียบและแก้ไข
+        3. alternatives: 2-3 ตัวอย่างประโยคทางเลือกที่ดีกว่า
+        4. errors: ชี้ข้อผิดพลาดและวิธีแก้ไขแบบเป็นกันเอง
         5. grammarAnalysis:
-           - score: 0-100
-           - issues: สูงสุด 3 รายการ (type, description สั้น, severity, suggestion สั้น)
-           - strengths: 2-3 ข้อ
-           - recommendations: 2-3 ข้อ
+           - score: คะแนน 0-100
+           - starRating: ดาว 1-5 (คำนวณจาก score: 1-20=1ดาว, 21-40=2ดาว, 41-60=3ดาว, 61-80=4ดาว, 81-100=5ดาว)
+           - issues: ปัญหา grammar (type, description, severity, suggestion, position)
+           - strengths: จุดแข็งด้าน grammar
+           - recommendations: คำแนะนำปรับปรุง
+           - tenseAnalysis: วิเคราะห์ tense (detectedTense, isCorrect, explanation, alternatives, usage)
+           - structureAnalysis: วิเคราะห์โครงสร้าง (pattern, isNatural, explanation, improvements, comparison)
+           - complexity: "simple" | "medium" | "complex"
         6. vocabularyAnalysis:
-           - score: 0-100
+           - score: คะแนน 0-100
+           - starRating: ดาว 1-5 (คำนวณจาก score เหมือน grammar)
            - level: "beginner" | "intermediate" | "advanced"
-           - appropriateWords: 3-5 คำ
-           - inappropriateWords: 0-3 คำ
-           - suggestions: 2-3 รายการ (object: original, suggested, reason สั้น, context สั้น) **Required**
+           - appropriateWords: คำที่ใช้ถูกต้อง
+           - inappropriateWords: คำที่ใช้ไม่เหมาะสม
+           - suggestions: คำแนะนำคำศัพท์ (original, suggested, reason, context)
+           - wordBreakdown: วิเคราะห์แต่ละคำ (word, position, partOfSpeech, difficulty, phonics, meaning, commonUsage, alternatives)
+           - overallDifficulty: "easy" | "medium" | "hard"
         7. contextAnalysis:
-           - score: 0-100
+           - score: คะแนน 0-100
+           - starRating: ดาว 1-5 (คำนวณจาก score เหมือน grammar)
            - appropriateness: "formal" | "informal" | "neutral"
-           - culturalNotes: 1-2 ข้อ
-           - usageNotes: 1-2 ข้อ
-           - situationalFit: 1 ประโยคสรุปความเหมาะสม
-        8. confidence: 0.0-1.0
-        9. suggestions: 3-5 ข้อ แนะนำที่ทำได้ทันที (แต่ละข้อ ≤ 15 คำ) **Required**
+           - culturalNotes: หมายเหตุทางวัฒนธรรม
+           - usageNotes: หมายเหตุการใช้งาน
+           - situationalFit: ความเหมาะสมกับสถานการณ์
+        8. confidence: ความมั่นใจในการวิเคราะห์ 0.0-1.0
+        9. suggestions: คำแนะนำสรุปที่เอาไปใช้จริงได้
+        10. overallStarRating: ดาวรวม 1-5 (เฉลี่ยจาก grammar, vocabulary, context)
 
-        หมายเหตุ:
-        - ใช้คำไทยที่เข้าใจง่าย; คำศัพท์/grammar technical terms ใช้ภาษาอังกฤษได้เมื่อจำเป็น.
-        - หลีกเลี่ยงคำกำกวม เช่น "อาจจะ", "น่าจะ"; ให้ข้อเสนอแนะที่ชัดเจนลงมือทำได้ทันที.
+        สำคัญ: 
+        - wordBreakdown ต้องวิเคราะห์ทุกคำในประโยค
+        - phonics ให้ IPA notation, syllables, และ stress pattern
+        - อธิบายทุกอย่างเป็นภาษาไทยแบบเข้าใจง่าย
+        - ให้เหตุผลว่าทำไมผิด และจะปรับปรุงยังไง
       `);
 
       logger.info("AnalyzerAgent initialization completed successfully");

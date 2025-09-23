@@ -49,12 +49,11 @@ export interface CreatePhraseInput {
   isBookmarked?: boolean
 }
 
-// Input interface for updating existing phrases
+// Update interface for phrase operations
 export interface UpdatePhraseInput {
   englishPhrase?: string
   userTranslation?: string
   context?: string
-  analysis?: PhraseAnalysis
   tags?: string[]
   difficulty?: 'beginner' | 'intermediate' | 'advanced'
   isBookmarked?: boolean

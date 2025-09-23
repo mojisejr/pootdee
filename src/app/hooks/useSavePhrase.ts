@@ -176,7 +176,8 @@ export function useSavePhrase(): UseSavePhraseReturn {
         console.log("INFO: Phrase saved successfully", {
           phraseId: apiResponse.data?.id,
           userId: user.id,
-          englishPhrase: saveData.englishPhrase.substring(0, 50) + "...",
+          englishPhrase: saveData.englishPhrase ? saveData.englishPhrase.substring(0, 50) + "..." : "N/A",
+          userTranslation: saveData.userTranslation ? saveData.userTranslation.substring(0, 50) + "..." : "N/A",
           timestamp: new Date().toISOString(),
         });
 

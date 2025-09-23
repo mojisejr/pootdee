@@ -16,16 +16,12 @@ const MAX_CONTEXT_LENGTH = 500;
 export const SaveInputSchema = z.object({
   englishPhrase: z
     .string()
-    .min(MIN_PHRASE_LENGTH, "English phrase is required")
     .max(
       MAX_PHRASE_LENGTH,
       `English phrase must be less than ${MAX_PHRASE_LENGTH} characters`
     )
     .trim()
-    .refine(
-      (val) => val.length > 0,
-      "English phrase cannot be empty or only whitespace"
-    ),
+    .optional(),
 
   userTranslation: z
     .string()
@@ -44,7 +40,18 @@ export const SaveInputSchema = z.object({
     )
     .trim()
     .optional(),
-});
+}).refine(
+  (data) => {
+    // At least one of englishPhrase or userTranslation must be provided and non-empty
+    const hasEnglishPhrase = data.englishPhrase && data.englishPhrase.trim().length > 0;
+    const hasUserTranslation = data.userTranslation && data.userTranslation.trim().length > 0;
+    return hasEnglishPhrase || hasUserTranslation;
+  },
+  {
+    message: "At least one field (English phrase or translation) must be provided",
+    path: ["englishPhrase"], // This will be the primary error path
+  }
+);
 
 // Type inference from schema
 export type SaveInput = z.infer<typeof SaveInputSchema>;
