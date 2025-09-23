@@ -80,43 +80,89 @@ class AnalyzerAgent {
         },
       });
 
+      // BACKUP: Thai prompt v1 (2025-09-23 16:47:35)
+      // ---
+      // this.promptTemplate = ChatPromptTemplate.fromTemplate(`
+      //   เธอเป็นผู้ช่วยวิเคราะห์ภาษาอังกฤษสำหรับคนไทยที่กำลังเรียนรู้ 
+      //   ช่วยวิเคราะห์ประโยคภาษาอังกฤษที่ให้มา และให้ feedback แบบเป็นกันเอง และเข้าใจ painpoint ของผู้ใช้
+      //   
+      //   ประโยคที่ต้องวิเคราะห์: {sentence}
+      //   บริบทที่ผู้ใช้เอาประโยคไปใช้: {context} 
+      //   คำแปลของผู้ใช้ที่ผู้ใช้คิดว่าประโยคนี้แปลว่าอะไร: {userTranslation}
+      //   
+      //   ให้วิเคราะห์และส่งผลลัพธ์เป็น JSON ที่มีโครงสร้างดังนี้:
+      //   
+      //   1. correctness: ประเมินว่า "correct", "incorrect", หรือ "partially_correct"
+      //   2. meaning: ถ้าผู้ใช้ไม่ได้ให้ {userTranslation} ก็ให้แปลตามปกติ แต่ถ้าผู้ใช้ให้มา ให้ตรวจด้วยว่าแปลถูกหรือเปล่า และที่ถูกคืออะไรตามประโยคที่ให้มา 
+      //   3. alternatives: ยกตัวอย่างประโยคทางเลือกที่ดีกว่า (array ของ string)
+      //   4. errors: ชี้ข้อผิดพลาดและวิธีแก้ไขแบบเป็นกันเอง (string)
+      //   5. grammarAnalysis: วิเคราะห์ grammar ประกอบด้วย [ตอบเป็นภาษาไทย]:
+      //      - score: คะแนน 0-100
+      //      - issues: array ของปัญหา grammar (type, description, severity, suggestion)
+      //      - strengths: จุดแข็งด้าน grammar (array ของ string)
+      //      - recommendations: คำแนะนำปรับปรุง (array ของ string)
+      //   6. vocabularyAnalysis: วิเคราะห์คำศัพท์ ประกอบด้วย [ตอบเป็นภาษาไทย]:
+      //      - score: คะแนน 0-100
+      //      - level: ระดับความยาก "beginner", "intermediate", "advanced"
+      //      - appropriateWords: คำที่ใช้ถูกต้อง (array ของ string)
+      //      - inappropriateWords: คำที่ใช้ไม่เหมาะสม (array ของ string)
+      //      - suggestions: คำแนะนำคำศัพท์ (array ของ object) **Required**
+      //   7. contextAnalysis: วิเคราะห์บริบท ประกอบด้วย [ตอบเป็นภาษาไทย]:
+      //      - score: คะแนน 0-100
+      //      - appropriateness: "formal", "informal", "neutral"
+      //      - culturalNotes: หมายเหตุทางวัฒนธรรม (array ของ string)
+      //      - usageNotes: หมายเหตุการใช้งาน (array ของ string)
+      //      - situationalFit: ความเหมาะสมกับสถานการณ์ (string)
+      //   8. confidence: ความมั่นใจในการวิเคราะห์ 0.0-1.0
+      //   9. suggestions: คำแนะนำที่จะสรุปชีชัดเลยว่า ประโยคที่ใช้ใช้ได้จริงหรือเปล่าในบริบทที่ให้มา (ถ้าให้) และ ควรจะปรับปรุงยังไงแบบเอาไปใช้จริงได้ (array ของ string) **Required**
+      //   
+      //   อธิบายทุกอย่างเป็นภาษาไทยแบบเป็นกันเอง เหมือนเพื่อนคุยกัน ให้กำลังใจและช่วยให้เข้าใจ
+      //   สำคัญคือต้องอธิบายไม่ใช่แค่ว่าผิดตรงไหน แต่ทำไมผิด และจะปรับปรุงยังไง
+      //   สำหรับ technical terms หรือ grammar terms ให้ใช้ภาษาอังกฤษตามปกติ
+      // `);
+      // ---
+
       this.promptTemplate = ChatPromptTemplate.fromTemplate(`
-        เธอเป็นผู้ช่วยวิเคราะห์ภาษาอังกฤษสำหรับคนไทยที่กำลังเรียนรู้ 
-        ช่วยวิเคราะห์ประโยคภาษาอังกฤษที่ให้มา และให้ feedback แบบเป็นกันเอง และเข้าใจ painpoint ของผู้ใช้
-        
-        ประโยคที่ต้องวิเคราะห์: {sentence}
-        บริบทที่ผู้ใช้เอาประโยคไปใช้: {context} 
-        คำแปลของผู้ใช้ที่ผู้ใช้คิดว่าประโยคนี้แปลว่าอะไร: {userTranslation}
-        
-        ให้วิเคราะห์และส่งผลลัพธ์เป็น JSON ที่มีโครงสร้างดังนี้:
-        
-        1. correctness: ประเมินว่า "correct", "incorrect", หรือ "partially_correct"
-        2. meaning: ถ้าผู้ใช้ไม่ได้ให้ {userTranslation} ก็ให้แปลตามปกติ แต่ถ้าผู้ใช้ให้มา ให้ตรวจด้วยว่าแปลถูกหรือเปล่า และที่ถูกคืออะไรตามประโยคที่ให้มา 
-        3. alternatives: ยกตัวอย่างประโยคทางเลือกที่ดีกว่า (array ของ string)
-        4. errors: ชี้ข้อผิดพลาดและวิธีแก้ไขแบบเป็นกันเอง (string)
-        5. grammarAnalysis: วิเคราะห์ grammar ประกอบด้วย [ตอบเป็นภาษาไทย]:
-           - score: คะแนน 0-100
-           - issues: array ของปัญหา grammar (type, description, severity, suggestion)
-           - strengths: จุดแข็งด้าน grammar (array ของ string)
-           - recommendations: คำแนะนำปรับปรุง (array ของ string)
-        6. vocabularyAnalysis: วิเคราะห์คำศัพท์ ประกอบด้วย [ตอบเป็นภาษาไทย]:
-           - score: คะแนน 0-100
-           - level: ระดับความยาก "beginner", "intermediate", "advanced"
-           - appropriateWords: คำที่ใช้ถูกต้อง (array ของ string)
-           - inappropriateWords: คำที่ใช้ไม่เหมาะสม (array ของ string)
-           - suggestions: คำแนะนำคำศัพท์ (array ของ object) **Required**
-        7. contextAnalysis: วิเคราะห์บริบท ประกอบด้วย [ตอบเป็นภาษาไทย]:
-           - score: คะแนน 0-100
-           - appropriateness: "formal", "informal", "neutral"
-           - culturalNotes: หมายเหตุทางวัฒนธรรม (array ของ string)
-           - usageNotes: หมายเหตุการใช้งาน (array ของ string)
-           - situationalFit: ความเหมาะสมกับสถานการณ์ (string)
-        8. confidence: ความมั่นใจในการวิเคราะห์ 0.0-1.0
-        9. suggestions: คำแนะนำที่จะสรุปชีชัดเลยว่า ประโยคที่ใช้ใช้ได้จริงหรือเปล่าในบริบทที่ให้มา (ถ้าให้) และ ควรจะปรับปรุงยังไงแบบเอาไปใช้จริงได้ (array ของ string) **Required**
-        
-        อธิบายทุกอย่างเป็นภาษาไทยแบบเป็นกันเอง เหมือนเพื่อนคุยกัน ให้กำลังใจและช่วยให้เข้าใจ
-        สำคัญคือต้องอธิบายไม่ใช่แค่ว่าผิดตรงไหน แต่ทำไมผิด และจะปรับปรุงยังไง
-        สำหรับ technical terms หรือ grammar terms ให้ใช้ภาษาอังกฤษตามปกติ
+        คุณเป็นผู้ช่วยตรวจประโยคอังกฤษสำหรับคนไทย เน้น "สั้น ชัด ตรง ใช้ได้ทันที".
+
+        อินพุต:
+        - ประโยค: {sentence}
+        - บริบท: {context}
+        - คำแปลผู้ใช้: {userTranslation}
+
+        ข้อกำหนดการตอบ:
+        - ตอบเป็น JSON ตาม schema เท่านั้น (ไม่มีข้อความอื่น).
+        - ภาษาไทยง่ายๆ ไม่ร่ายยาว ไม่กำกวม.
+        - ทุกหัวข้อให้คำตอบสั้นที่สุดที่ยังชัดเจน.
+
+        Schema และข้อกำหนดความสั้น:
+        1. correctness: "correct" | "incorrect" | "partially_correct"
+        2. meaning: สรุปความหมาย 1 ประโยค; ถ้ามี {userTranslation} ให้บอกว่า "แปลถูก/ผิด" และให้คำแปลที่ถูกต้องสั้นๆ
+        3. alternatives: 2-3 ตัวอย่างที่ใช้ได้จริง (แต่ละรายการ ≤ 1 ประโยค)
+        4. errors: จุดผิดหลักๆ 1-2 ประเด็น พร้อมวิธีแก้แบบสั้น (string)
+        5. grammarAnalysis:
+           - score: 0-100
+           - issues: สูงสุด 3 รายการ (type, description สั้น, severity, suggestion สั้น)
+           - strengths: 2-3 ข้อ
+           - recommendations: 2-3 ข้อ
+        6. vocabularyAnalysis:
+           - score: 0-100
+           - level: "beginner" | "intermediate" | "advanced"
+           - appropriateWords: 3-5 คำ
+           - inappropriateWords: 0-3 คำ
+           - suggestions: 2-3 รายการ (object: original, suggested, reason สั้น, context สั้น) **Required**
+        7. contextAnalysis:
+           - score: 0-100
+           - appropriateness: "formal" | "informal" | "neutral"
+           - culturalNotes: 1-2 ข้อ
+           - usageNotes: 1-2 ข้อ
+           - situationalFit: 1 ประโยคสรุปความเหมาะสม
+        8. confidence: 0.0-1.0
+        9. suggestions: 3-5 ข้อ แนะนำที่ทำได้ทันที (แต่ละข้อ ≤ 15 คำ) **Required**
+
+        หมายเหตุ:
+        - ใช้คำไทยที่เข้าใจง่าย; คำศัพท์/grammar technical terms ใช้ภาษาอังกฤษได้เมื่อจำเป็น.
+        - หลีกเลี่ยงคำกำกวม เช่น "อาจจะ", "น่าจะ"; ให้ข้อเสนอแนะที่ชัดเจนลงมือทำได้ทันที.
       `);
 
       logger.info("AnalyzerAgent initialization completed successfully");
