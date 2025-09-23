@@ -102,7 +102,37 @@ describe('Analyze API Logic', () => {
           correctness: "correct" as const,
           meaning: "This is a test sentence meaning",
           alternatives: ["Alternative 1", "Alternative 2"],
-          errors: ""
+          errors: "",
+          grammarAnalysis: {
+            score: 85,
+            issues: [],
+            strengths: ["Good sentence structure"],
+            recommendations: ["Keep practicing"]
+          },
+          vocabularyAnalysis: {
+            score: 90,
+            level: "intermediate" as const,
+            appropriateWords: ["test", "sentence"],
+            inappropriateWords: [],
+            suggestions: []
+          },
+          contextAnalysis: {
+            score: 88,
+            appropriateness: "neutral" as const,
+            culturalNotes: [],
+            usageNotes: ["Good for general use"],
+            situationalFit: "Appropriate for most contexts"
+          },
+          confidence: 0.85,
+          suggestions: ["Keep practicing", "Try more complex sentences"]
+        },
+        metadata: {
+          timestamp: new Date().toISOString(),
+          processingTimeMs: 1500,
+          modelUsed: "gemini-1.5-flash",
+          confidence: 0.85,
+          retryCount: 0,
+          version: "1.0.0"
         }
       };
 
@@ -118,7 +148,8 @@ describe('Analyze API Logic', () => {
           message: "Validation failed",
           userMessage: "Please check your input",
           retryable: false,
-          suggestedAction: "Fix the input and try again"
+          suggestedAction: "Fix the input and try again",
+          timestamp: new Date().toISOString()
         }
       };
 
@@ -150,6 +181,8 @@ describe('Analyze API Logic', () => {
         ErrorType.API_RATE_LIMIT,
         ErrorType.API_ERROR,
         ErrorType.NETWORK_ERROR,
+        ErrorType.PARSING_ERROR,
+        ErrorType.STRUCTURED_OUTPUT_ERROR,
         ErrorType.UNKNOWN
       ];
 
@@ -160,7 +193,8 @@ describe('Analyze API Logic', () => {
             type: errorType,
             message: "Test error",
             userMessage: "User friendly message",
-            retryable: true
+            retryable: true,
+            timestamp: new Date().toISOString()
           }
         };
 
