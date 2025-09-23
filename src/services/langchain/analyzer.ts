@@ -81,26 +81,42 @@ class AnalyzerAgent {
       });
 
       this.promptTemplate = ChatPromptTemplate.fromTemplate(`
-        You are an expert English language analyzer specializing in helping Thai learners improve their English.
+        เธอเป็นผู้ช่วยวิเคราะห์ภาษาอังกฤษสำหรับคนไทยที่กำลังเรียนรู้ 
+        ช่วยวิเคราะห์ประโยคภาษาอังกฤษที่ให้มา และให้ feedback แบบเป็นกันเองนะ
         
-        Analyze the following English sentence and provide comprehensive feedback:
+        ประโยคที่ต้องวิเคราะห์: {sentence}
+        บริบท: {context}
+        คำแปลของผู้ใช้: {userTranslation}
         
-        **Sentence to analyze:** {sentence}
-        **Context provided:** {context}
-        **User's translation attempt:** {userTranslation}
+        ให้วิเคราะห์และส่งผลลัพธ์เป็น JSON ที่มีโครงสร้างดังนี้:
         
-        Provide a detailed analysis that includes:
-        1. Overall correctness assessment
-        2. Clear meaning explanation
-        3. Grammar analysis with specific scoring
-        4. Vocabulary analysis and appropriateness
-        5. Context and cultural considerations
-        6. Specific improvement suggestions
-        7. Alternative expressions
-        8. Error identification and corrections
+        1. correctness: ประเมินว่า "correct", "incorrect", หรือ "partially_correct"
+        2. meaning: อธิบายความหมายของประโยคเป็นภาษาไทยแบบเป็นกันเอง
+        3. alternatives: ยกตัวอย่างประโยคทางเลือกที่ดีกว่า (array ของ string)
+        4. errors: ชี้ข้อผิดพลาดและวิธีแก้ไขแบบเป็นกันเอง (string)
+        5. grammarAnalysis: วิเคราะห์ grammar ประกอบด้วย:
+           - score: คะแนน 0-100
+           - issues: array ของปัญหา grammar (type, description, severity, suggestion)
+           - strengths: จุดแข็งด้าน grammar (array ของ string)
+           - recommendations: คำแนะนำปรับปรุง (array ของ string)
+        6. vocabularyAnalysis: วิเคราะห์คำศัพท์ ประกอบด้วย:
+           - score: คะแนน 0-100
+           - level: ระดับความยาก "beginner", "intermediate", "advanced"
+           - appropriateWords: คำที่ใช้ถูกต้อง (array ของ string)
+           - inappropriateWords: คำที่ใช้ไม่เหมาะสม (array ของ string)
+           - suggestions: คำแนะนำคำศัพท์ (array ของ object)
+        7. contextAnalysis: วิเคราะห์บริบท ประกอบด้วย:
+           - score: คะแนน 0-100
+           - appropriateness: "formal", "informal", "neutral"
+           - culturalNotes: หมายเหตุทางวัฒนธรรม (array ของ string)
+           - usageNotes: หมายเหตุการใช้งาน (array ของ string)
+           - situationalFit: ความเหมาะสมกับสถานการณ์ (string)
+        8. confidence: ความมั่นใจในการวิเคราะห์ 0.0-1.0
+        9. suggestions: คำแนะนำทั่วไป (array ของ string)
         
-        Be constructive, encouraging, and provide actionable feedback for improvement.
-        Focus on helping the learner understand not just what's wrong, but why and how to improve.
+        อธิบายทุกอย่างเป็นภาษาไทยแบบเป็นกันเอง เหมือนเพื่อนคุยกัน ให้กำลังใจและช่วยให้เข้าใจ
+        สำคัญคือต้องอธิบายไม่ใช่แค่ว่าผิดตรงไหน แต่ทำไมผิด และจะปรับปรุงยังไง
+        สำหรับ technical terms หรือ grammar terms ให้ใช้ภาษาอังกฤษตามปกติ
       `);
 
       logger.info("AnalyzerAgent initialization completed successfully");
