@@ -128,7 +128,7 @@ export interface ContextAnalysis {
   situationalFit: string;
 }
 
-export type AnalysisResult = AnalyzerOutput;
+export type AnalysisResult = EnhancedAnalyzerOutput;
 
 // ============================================================================
 // Enhanced Error Handling Interfaces
@@ -328,6 +328,117 @@ export const AnalyzerOutputSchema = z.object({
   suggestions: z.array(z.string()),
 });
 
+// Enhanced Grammar Analysis Schema with star ratings
+export const EnhancedGrammarAnalysisSchema = z.object({
+  score: z.number().min(0).max(100), // Legacy field
+  starRating: z.number().min(1).max(5),
+  structureComparison: z.object({
+    userStructure: z.string(),
+    correctStructure: z.string(),
+    differences: z.array(z.object({
+      type: z.enum(["word_order", "missing_word", "extra_word", "wrong_word", "tense", "agreement"]),
+      position: z.number(),
+      userText: z.string(),
+      correctText: z.string(),
+      explanation: z.string(),
+    })),
+    similarity: z.number().min(0).max(1),
+    explanation: z.string(),
+  }),
+  tenseAnalysis: z.object({
+    detectedTense: z.enum(["simple_present", "present_continuous", "present_perfect", "present_perfect_continuous", "simple_past", "past_continuous", "past_perfect", "past_perfect_continuous", "simple_future", "future_continuous", "future_perfect", "future_perfect_continuous", "conditional", "subjunctive", "imperative"]),
+    correctTense: z.enum(["simple_present", "present_continuous", "present_perfect", "present_perfect_continuous", "simple_past", "past_continuous", "past_perfect", "past_perfect_continuous", "simple_future", "future_continuous", "future_perfect", "future_perfect_continuous", "conditional", "subjunctive", "imperative"]),
+    isCorrect: z.boolean(),
+    explanation: z.string(),
+    examples: z.array(z.string()),
+    commonMistakes: z.array(z.string()),
+  }),
+  issues: z.array(GrammarIssueSchema),
+  strengths: z.array(z.string()),
+  recommendations: z.array(z.string()),
+});
+
+// Enhanced Vocabulary Analysis Schema with word analysis
+export const EnhancedVocabularyAnalysisSchema = z.object({
+  score: z.number().min(0).max(100), // Legacy field
+  starRating: z.number().min(1).max(5),
+  level: z.enum(["beginner", "intermediate", "advanced"]),
+  wordAnalysis: z.array(z.object({
+    word: z.string(),
+    position: z.number(),
+    partOfSpeech: z.object({
+      primary: z.enum(["noun", "pronoun", "verb", "adjective", "adverb", "preposition", "conjunction", "interjection", "article", "determiner", "auxiliary", "modal", "particle"]),
+      secondary: z.enum(["noun", "pronoun", "verb", "adjective", "adverb", "preposition", "conjunction", "interjection", "article", "determiner", "auxiliary", "modal", "particle"]).optional(),
+      explanation: z.string(),
+      examples: z.array(z.string()),
+    }),
+    phonetics: z.object({
+      ipa: z.string(),
+      simplified: z.string(),
+      syllables: z.array(z.string()),
+      stress: z.array(z.number()),
+      audioUrl: z.string().optional(),
+    }),
+    meaning: z.string(),
+    usage: z.string(),
+    difficulty: z.enum(["beginner", "intermediate", "advanced"]),
+  })),
+  phoneticBreakdown: z.object({
+    fullSentence: z.object({
+      ipa: z.string(),
+      simplified: z.string(),
+      syllableCount: z.number(),
+    }),
+    wordByWord: z.array(z.object({
+      word: z.string(),
+      phonetics: z.object({
+        ipa: z.string(),
+        simplified: z.string(),
+        syllables: z.array(z.string()),
+        stress: z.array(z.number()),
+        audioUrl: z.string().optional(),
+      }),
+    })),
+    pronunciationTips: z.array(z.string()),
+  }),
+  appropriateWords: z.array(z.string()),
+  inappropriateWords: z.array(z.string()),
+  suggestions: z.array(VocabularySuggestionSchema),
+});
+
+// Enhanced Context Analysis Schema with star ratings
+export const EnhancedContextAnalysisSchema = z.object({
+  score: z.number().min(0).max(100), // Legacy field
+  starRating: z.number().min(1).max(5),
+  friendlyHeading: z.string(),
+  appropriateness: z.enum(["very_appropriate", "appropriate", "somewhat_appropriate", "inappropriate", "very_inappropriate"]),
+  formality: z.enum(["very_formal", "formal", "neutral", "informal", "very_informal"]),
+  culturalNotes: z.array(z.string()),
+  situationalFit: z.string(),
+  improvements: z.array(z.string()),
+});
+
+// Enhanced Analyzer Output Schema
+export const EnhancedAnalyzerOutputSchema = z.object({
+  correctness: z.enum(["correct", "incorrect", "partially_correct"]),
+  meaning: z.string(),
+  alternatives: z.array(z.string()),
+  errors: z.string(),
+  grammarAnalysis: EnhancedGrammarAnalysisSchema,
+  vocabularyAnalysis: EnhancedVocabularyAnalysisSchema,
+  contextAnalysis: EnhancedContextAnalysisSchema,
+  confidence: z.number().min(0).max(1),
+  suggestions: z.array(z.string()),
+  overallRating: z.number().min(1).max(5),
+  severity: z.enum(["low", "medium", "high", "critical"]),
+  friendlyHeadings: z.object({
+    grammar: z.string(),
+    vocabulary: z.string(),
+    context: z.string(),
+    overall: z.string(),
+  }),
+});
+
 // Enhanced Request/Response Schemas
 export const AnalyzeRequestSchema = z.object({
   englishPhrase: z.string().min(1, "English phrase is required").max(500, "Phrase too long"),
@@ -342,7 +453,7 @@ export const AnalyzeRequestSchema = z.object({
 
 export const AnalyzeResponseSchema = z.object({
   success: z.boolean(),
-  data: AnalyzerOutputSchema.optional(),
+  data: EnhancedAnalyzerOutputSchema.optional(),
   metadata: AnalysisMetadataSchema.optional(),
   error: z.object({
     type: z.nativeEnum(ErrorType),
@@ -376,7 +487,7 @@ export const WorkflowStateSchema = z.object({
   context: z.string().optional(),
   isValidSentence: z.boolean(),
   filterError: z.string().optional(),
-  analysisResult: AnalyzerOutputSchema.optional(),
+  analysisResult: EnhancedAnalyzerOutputSchema.optional(),
   analysisError: z.string().optional(),
   currentStep: z.enum(["filter", "analyze", "complete", "error"]),
   errorDetails: ErrorDetailsSchema.optional(),
@@ -607,3 +718,140 @@ export interface LoggingConfig {
 
 export type NodeFunction<T = WorkflowState> = (state: T) => Promise<T>;
 export type ConditionalEdgeFunction<T = WorkflowState> = (state: T) => string;
+
+// ============================================================================
+// Enhanced Word Analysis Interfaces (NEW)
+// ============================================================================
+
+export interface WordAnalysis {
+  word: string;
+  position: number;
+  partOfSpeech: PartOfSpeech;
+  phonetics: PhoneticInfo;
+  meaning: string;
+  usage: string;
+  difficulty: "beginner" | "intermediate" | "advanced";
+}
+
+export interface PartOfSpeech {
+  primary: POSTag;
+  secondary?: POSTag;
+  explanation: string;
+  examples: string[];
+}
+
+export type POSTag = 
+  | "noun" | "pronoun" | "verb" | "adjective" | "adverb" 
+  | "preposition" | "conjunction" | "interjection" | "article" 
+  | "determiner" | "auxiliary" | "modal" | "particle";
+
+export interface PhoneticInfo {
+  ipa: string; // International Phonetic Alphabet
+  simplified: string; // Simplified pronunciation for Thai learners
+  syllables: string[];
+  stress: number[]; // Array of stressed syllable indices
+  audioUrl?: string; // Optional audio pronunciation URL
+}
+
+// ============================================================================
+// Enhanced Grammar Analysis Interfaces (UPDATED)
+// ============================================================================
+
+export interface EnhancedGrammarAnalysis extends GrammarAnalysis {
+  structureComparison: StructureComparison;
+  tenseAnalysis: TenseAnalysis;
+  starRating: number; // 1-5 stars instead of 0-100 score
+}
+
+export interface StructureComparison {
+  userStructure: string;
+  correctStructure: string;
+  differences: StructureDifference[];
+  similarity: number; // 0.0-1.0
+  explanation: string;
+}
+
+export interface StructureDifference {
+  type: "word_order" | "missing_word" | "extra_word" | "wrong_word" | "tense" | "agreement";
+  position: number;
+  userText: string;
+  correctText: string;
+  explanation: string;
+}
+
+export interface TenseAnalysis {
+  detectedTense: TenseType;
+  correctTense: TenseType;
+  isCorrect: boolean;
+  explanation: string;
+  examples: string[];
+  commonMistakes: string[];
+}
+
+export type TenseType = 
+  | "simple_present" | "present_continuous" | "present_perfect" | "present_perfect_continuous"
+  | "simple_past" | "past_continuous" | "past_perfect" | "past_perfect_continuous"
+  | "simple_future" | "future_continuous" | "future_perfect" | "future_perfect_continuous"
+  | "conditional" | "subjunctive" | "imperative";
+
+// ============================================================================
+// Enhanced Vocabulary Analysis Interfaces (UPDATED)
+// ============================================================================
+
+export interface EnhancedVocabularyAnalysis extends VocabularyAnalysis {
+  wordAnalysis: WordAnalysis[];
+  starRating: number; // 1-5 stars instead of 0-100 score
+  phoneticBreakdown: PhoneticBreakdown;
+}
+
+export interface PhoneticBreakdown {
+  fullSentence: {
+    ipa: string;
+    simplified: string;
+    syllableCount: number;
+  };
+  wordByWord: Array<{
+    word: string;
+    phonetics: PhoneticInfo;
+  }>;
+  pronunciationTips: string[];
+}
+
+// ============================================================================
+// Enhanced Context Analysis Interfaces (UPDATED)
+// ============================================================================
+
+export interface EnhancedContextAnalysis extends Omit<ContextAnalysis, 'appropriateness' | 'usageNotes'> {
+  starRating: number; // 1-5 stars instead of 0-100 score
+  friendlyHeading: string; // User-friendly heading instead of technical terms
+  appropriateness: "very_appropriate" | "appropriate" | "somewhat_appropriate" | "inappropriate" | "very_inappropriate";
+  formality: "very_formal" | "formal" | "neutral" | "informal" | "very_informal";
+  culturalNotes: string[];
+  situationalFit: string;
+  improvements: string[];
+}
+
+// ============================================================================
+// Updated Main Analyzer Output Interface
+// ============================================================================
+
+export interface EnhancedAnalyzerOutput extends Omit<AnalyzerOutput, 'grammarAnalysis' | 'vocabularyAnalysis' | 'contextAnalysis'> {
+  // Enhanced analysis fields with star ratings
+  grammarAnalysis: EnhancedGrammarAnalysis;
+  vocabularyAnalysis: EnhancedVocabularyAnalysis;
+  contextAnalysis: EnhancedContextAnalysis;
+  
+  // Overall star rating (1-5)
+  overallRating: number;
+  
+  // Severity level
+  severity: "low" | "medium" | "high" | "critical";
+  
+  // Friendly headings for better UX
+  friendlyHeadings: {
+    grammar: string;
+    vocabulary: string;
+    context: string;
+    overall: string;
+  };
+}

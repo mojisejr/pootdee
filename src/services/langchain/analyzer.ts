@@ -1,16 +1,13 @@
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { z } from "zod";
 import {
-  AnalysisResult,
   AnalyzerInput,
-  AnalyzerOutput,
   AnalyzerInputSchema,
-  AnalyzerOutputSchema,
+  EnhancedAnalyzerOutput as ImportedEnhancedAnalyzerOutput,
+  EnhancedAnalyzerOutputSchema,
   AnalysisMetadata,
   parseStructuredOutput,
   createAnalysisMetadata,
-  isValidAnalyzerOutput,
 } from "../../interfaces/langchain";
 import { createLogger } from "../../lib/logger";
 
@@ -31,7 +28,7 @@ export interface AlternativesResult {
 }
 
 export interface BatchAnalysisResult {
-  results: AnalyzerOutput[];
+  results: EnhancedAnalyzerOutput[];
   errors: Array<{ index: number; error: string }>;
   totalProcessed: number;
   successCount: number;
@@ -48,7 +45,7 @@ export interface TranslationComparisonResult {
 }
 
 // Enhanced analyzer output with metadata
-export interface EnhancedAnalyzerOutput extends AnalyzerOutput {
+export interface EnhancedAnalyzerOutput extends ImportedEnhancedAnalyzerOutput {
   metadata?: AnalysisMetadata;
 }
 
@@ -80,50 +77,8 @@ class AnalyzerAgent {
         },
       });
 
-      // BACKUP: Thai prompt v1 (2025-09-23 16:47:35)
-      // ---
-      // this.promptTemplate = ChatPromptTemplate.fromTemplate(`
-      //   เธอเป็นผู้ช่วยวิเคราะห์ภาษาอังกฤษสำหรับคนไทยที่กำลังเรียนรู้ 
-      //   ช่วยวิเคราะห์ประโยคภาษาอังกฤษที่ให้มา และให้ feedback แบบเป็นกันเอง และเข้าใจ painpoint ของผู้ใช้
-      //   
-      //   ประโยคที่ต้องวิเคราะห์: {sentence}
-      //   บริบทที่ผู้ใช้เอาประโยคไปใช้: {context} 
-      //   คำแปลของผู้ใช้ที่ผู้ใช้คิดว่าประโยคนี้แปลว่าอะไร: {userTranslation}
-      //   
-      //   ให้วิเคราะห์และส่งผลลัพธ์เป็น JSON ที่มีโครงสร้างดังนี้:
-      //   
-      //   1. correctness: ประเมินว่า "correct", "incorrect", หรือ "partially_correct"
-      //   2. meaning: ถ้าผู้ใช้ไม่ได้ให้ {userTranslation} ก็ให้แปลตามปกติ แต่ถ้าผู้ใช้ให้มา ให้ตรวจด้วยว่าแปลถูกหรือเปล่า และที่ถูกคืออะไรตามประโยคที่ให้มา 
-      //   3. alternatives: ยกตัวอย่างประโยคทางเลือกที่ดีกว่า (array ของ string)
-      //   4. errors: ชี้ข้อผิดพลาดและวิธีแก้ไขแบบเป็นกันเอง (string)
-      //   5. grammarAnalysis: วิเคราะห์ grammar ประกอบด้วย [ตอบเป็นภาษาไทย]:
-      //      - score: คะแนน 0-100
-      //      - issues: array ของปัญหา grammar (type, description, severity, suggestion)
-      //      - strengths: จุดแข็งด้าน grammar (array ของ string)
-      //      - recommendations: คำแนะนำปรับปรุง (array ของ string)
-      //   6. vocabularyAnalysis: วิเคราะห์คำศัพท์ ประกอบด้วย [ตอบเป็นภาษาไทย]:
-      //      - score: คะแนน 0-100
-      //      - level: ระดับความยาก "beginner", "intermediate", "advanced"
-      //      - appropriateWords: คำที่ใช้ถูกต้อง (array ของ string)
-      //      - inappropriateWords: คำที่ใช้ไม่เหมาะสม (array ของ string)
-      //      - suggestions: คำแนะนำคำศัพท์ (array ของ object) **Required**
-      //   7. contextAnalysis: วิเคราะห์บริบท ประกอบด้วย [ตอบเป็นภาษาไทย]:
-      //      - score: คะแนน 0-100
-      //      - appropriateness: "formal", "informal", "neutral"
-      //      - culturalNotes: หมายเหตุทางวัฒนธรรม (array ของ string)
-      //      - usageNotes: หมายเหตุการใช้งาน (array ของ string)
-      //      - situationalFit: ความเหมาะสมกับสถานการณ์ (string)
-      //   8. confidence: ความมั่นใจในการวิเคราะห์ 0.0-1.0
-      //   9. suggestions: คำแนะนำที่จะสรุปชีชัดเลยว่า ประโยคที่ใช้ใช้ได้จริงหรือเปล่าในบริบทที่ให้มา (ถ้าให้) และ ควรจะปรับปรุงยังไงแบบเอาไปใช้จริงได้ (array ของ string) **Required**
-      //   
-      //   อธิบายทุกอย่างเป็นภาษาไทยแบบเป็นกันเอง เหมือนเพื่อนคุยกัน ให้กำลังใจและช่วยให้เข้าใจ
-      //   สำคัญคือต้องอธิบายไม่ใช่แค่ว่าผิดตรงไหน แต่ทำไมผิด และจะปรับปรุงยังไง
-      //   สำหรับ technical terms หรือ grammar terms ให้ใช้ภาษาอังกฤษตามปกติ
-      // `);
-      // ---
-
       this.promptTemplate = ChatPromptTemplate.fromTemplate(`
-        คุณเป็นผู้ช่วยตรวจประโยคอังกฤษสำหรับคนไทย เน้น "สั้น ชัด ตรง ใช้ได้ทันที".
+        คุณเป็นผู้ช่วยตรวจประโยคอังกฤษสำหรับคนไทย เน้น "สั้น ชัด ตรง ใช้ได้ทันที" พร้อมระบบให้คะแนนดาว 1-5 ดวง.
 
         อินพุต:
         - ประโยค: {sentence}
@@ -134,6 +89,7 @@ class AnalyzerAgent {
         - ตอบเป็น JSON ตาม schema เท่านั้น (ไม่มีข้อความอื่น).
         - ภาษาไทยง่ายๆ ไม่ร่ายยาว ไม่กำกวม.
         - ทุกหัวข้อให้คำตอบสั้นที่สุดที่ยังชัดเจน.
+        - ใช้ระบบดาว 1-5 ดวง (1=แย่มาก, 2=แย่, 3=ปานกลาง, 4=ดี, 5=ดีเยี่ยม).
 
         Schema และข้อกำหนดความสั้น:
         1. correctness: "correct" | "incorrect" | "partially_correct"
@@ -141,28 +97,45 @@ class AnalyzerAgent {
         3. alternatives: 2-3 ตัวอย่างที่ใช้ได้จริง (แต่ละรายการ ≤ 1 ประโยค)
         4. errors: จุดผิดหลักๆ 1-2 ประเด็น พร้อมวิธีแก้แบบสั้น (string)
         5. grammarAnalysis:
-           - score: 0-100
+           - score: 0-100 (legacy)
+           - starRating: 1-5 ดาว
+           - friendlyHeading: หัวข้อเป็นมิตร เช่น "โครงสร้างประโยค" แทน "Grammar Analysis"
+           - structureComparison: เปรียบเทียบโครงสร้างกับประโยคมาตรฐาน
+           - tenseAnalysis: วิเคราะห์ tense ที่ใช้และความถูกต้อง
            - issues: สูงสุด 3 รายการ (type, description สั้น, severity, suggestion สั้น)
            - strengths: 2-3 ข้อ
            - recommendations: 2-3 ข้อ
         6. vocabularyAnalysis:
-           - score: 0-100
+           - score: 0-100 (legacy)
+           - starRating: 1-5 ดาว
+           - friendlyHeading: หัวข้อเป็นมิตร เช่น "คำศัพท์และการใช้งาน"
            - level: "beginner" | "intermediate" | "advanced"
            - appropriateWords: 3-5 คำ
            - inappropriateWords: 0-3 คำ
+           - wordAnalysis: วิเคราะห์แต่ละคำ (word, partOfSpeech, phonetics, meaning, usage, difficulty)
+           - phoneticBreakdown: การออกเสียงทั้งประโยค (fullSentence, pronunciationTips)
            - suggestions: 2-3 รายการ (object: original, suggested, reason สั้น, context สั้น) **Required**
         7. contextAnalysis:
-           - score: 0-100
+           - score: 0-100 (legacy)
+           - starRating: 1-5 ดาว
+           - friendlyHeading: หัวข้อเป็นมิตร เช่น "บริบทและความเหมาะสม"
            - appropriateness: "formal" | "informal" | "neutral"
            - culturalNotes: 1-2 ข้อ
            - usageNotes: 1-2 ข้อ
            - situationalFit: 1 ประโยคสรุปความเหมาะสม
         8. confidence: 0.0-1.0
         9. suggestions: 3-5 ข้อ แนะนำที่ทำได้ทันที (แต่ละข้อ ≤ 15 คำ) **Required**
+        10. overallRating: 1-5 ดาว (คะแนนรวม)
+        11. friendlyHeadings: หัวข้อเป็นมิตรสำหรับแต่ละส่วน
+            - grammar: หัวข้อสำหรับส่วน grammar
+            - vocabulary: หัวข้อสำหรับส่วน vocabulary  
+            - context: หัวข้อสำหรับส่วน context
+            - overall: หัวข้อสำหรับส่วนสรุป
 
         หมายเหตุ:
         - ใช้คำไทยที่เข้าใจง่าย; คำศัพท์/grammar technical terms ใช้ภาษาอังกฤษได้เมื่อจำเป็น.
         - หลีกเลี่ยงคำกำกวม เช่น "อาจจะ", "น่าจะ"; ให้ข้อเสนอแนะที่ชัดเจนลงมือทำได้ทันที.
+        - หัวข้อเป็นมิตรควรใช้ภาษาไทยง่ายๆ ที่ผู้ใช้เข้าใจได้ทันที.
       `);
 
       logger.info("AnalyzerAgent initialization completed successfully");
@@ -207,7 +180,7 @@ class AnalyzerAgent {
 
       // Create structured output chain
       const structuredModel =
-        this.model.withStructuredOutput(AnalyzerOutputSchema);
+        this.model.withStructuredOutput(EnhancedAnalyzerOutputSchema);
       const chain = this.promptTemplate.pipe(structuredModel);
 
       logger.debug("Invoking AI model for analysis", {
@@ -230,7 +203,7 @@ class AnalyzerAgent {
       const processingTime = Date.now() - startTime;
 
       // Validate result
-      const parsedResult = parseStructuredOutput(AnalyzerOutputSchema, result);
+      const parsedResult = parseStructuredOutput(EnhancedAnalyzerOutputSchema, result);
       if (!parsedResult.success) {
         const error = new Error(
           `Invalid analysis result: ${parsedResult.error.message}`
@@ -416,7 +389,7 @@ class AnalyzerAgent {
     });
 
     try {
-      const results: AnalyzerOutput[] = [];
+      const results: EnhancedAnalyzerOutput[] = [];
       const errors: Array<{ index: number; error: string }> = [];
 
       for (let i = 0; i < inputs.length; i++) {

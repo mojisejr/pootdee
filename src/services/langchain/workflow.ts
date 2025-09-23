@@ -1,13 +1,9 @@
 import { analyzerAgent } from './analyzer';
 import { 
   WorkflowState, 
-  AnalysisResult, 
   AnalysisMetadata,
-  SentenceFilterInput,
-  SentenceFilterOutput,
   AnalyzerInput,
-  AnalyzerOutput,
-  createAnalysisMetadata
+  EnhancedAnalyzerOutput
 } from '../../interfaces/langchain';
 import { createLogger } from '../../lib/logger';
 
@@ -92,7 +88,7 @@ export class EnglishAnalysisWorkflow {
     userTranslation: string,
     context?: string,
     userId?: string
-  ): Promise<AnalyzerOutput> {
+  ): Promise<EnhancedAnalyzerOutput> {
     const startTime = Date.now();
     const sessionId = `workflow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
@@ -157,31 +153,69 @@ export class EnglishAnalysisWorkflow {
           }
         });
 
-        // Return error result with basic structure
+        // Return error result with enhanced structure
         return {
           correctness: 'incorrect',
           meaning: 'Invalid input detected',
           alternatives: [],
           errors: filterResult.filterError || 'Invalid input',
+          overallRating: 1,
+          severity: 'high' as const,
+          friendlyHeadings: {
+            grammar: 'Grammar',
+            vocabulary: 'Vocabulary',
+            context: 'Context',
+            overall: 'Overall'
+          },
           grammarAnalysis: {
             score: 0,
             issues: [],
             strengths: [],
-            recommendations: []
+            recommendations: [],
+            structureComparison: {
+              userStructure: englishPhrase,
+              correctStructure: englishPhrase,
+              differences: [],
+              similarity: 0,
+              explanation: 'Invalid input provided'
+            },
+            tenseAnalysis: {
+              detectedTense: 'simple_present' as const,
+              correctTense: 'simple_present' as const,
+              isCorrect: false,
+              explanation: 'Cannot analyze tense due to invalid input',
+              examples: [],
+              commonMistakes: []
+            },
+            starRating: 1
           },
           vocabularyAnalysis: {
             score: 0,
             level: 'beginner',
             appropriateWords: [],
             inappropriateWords: [],
-            suggestions: []
+            suggestions: [],
+            wordAnalysis: [],
+            starRating: 1,
+            phoneticBreakdown: {
+              fullSentence: {
+                ipa: '',
+                simplified: '',
+                syllableCount: 0
+              },
+              wordByWord: [],
+              pronunciationTips: []
+            }
           },
           contextAnalysis: {
             score: 0,
-            appropriateness: 'neutral',
+            appropriateness: 'inappropriate' as const,
             culturalNotes: [],
-            usageNotes: [],
-            situationalFit: 'Not applicable due to invalid input'
+            improvements: [],
+            situationalFit: 'Not applicable due to invalid input',
+            formality: 'neutral' as const,
+            starRating: 1,
+            friendlyHeading: 'Context Analysis'
           },
           confidence: 0,
           suggestions: ['Please provide a valid English phrase']
@@ -255,31 +289,69 @@ export class EnglishAnalysisWorkflow {
         }
       });
 
-      // Return error result
+      // Return error result with enhanced structure
       return {
         correctness: 'incorrect',
         meaning: `Analysis failed: ${errorMessage}`,
         alternatives: [],
         errors: errorMessage,
+        overallRating: 1,
+        severity: 'high' as const,
+        friendlyHeadings: {
+          grammar: 'Grammar',
+          vocabulary: 'Vocabulary',
+          context: 'Context',
+          overall: 'Overall'
+        },
         grammarAnalysis: {
           score: 0,
           issues: [],
           strengths: [],
-          recommendations: []
+          recommendations: [],
+          structureComparison: {
+            userStructure: '',
+            correctStructure: '',
+            differences: [],
+            similarity: 0,
+            explanation: 'Analysis failed'
+          },
+          tenseAnalysis: {
+            detectedTense: 'simple_present' as const,
+            correctTense: 'simple_present' as const,
+            isCorrect: false,
+            explanation: 'Cannot analyze tense due to error',
+            examples: [],
+            commonMistakes: []
+          },
+          starRating: 1
         },
         vocabularyAnalysis: {
           score: 0,
           level: 'beginner',
           appropriateWords: [],
           inappropriateWords: [],
-          suggestions: []
+          suggestions: [],
+          wordAnalysis: [],
+          starRating: 1,
+          phoneticBreakdown: {
+            fullSentence: {
+              ipa: '',
+              simplified: '',
+              syllableCount: 0
+            },
+            wordByWord: [],
+            pronunciationTips: []
+          }
         },
         contextAnalysis: {
           score: 0,
-          appropriateness: 'neutral',
+          appropriateness: 'inappropriate' as const,
           culturalNotes: [],
-          usageNotes: [],
-          situationalFit: 'Not applicable due to error'
+          improvements: [],
+          situationalFit: 'Not applicable due to error',
+          formality: 'neutral' as const,
+          starRating: 1,
+          friendlyHeading: 'Context Analysis'
         },
         confidence: 0,
         suggestions: ['Please try again with a different input']

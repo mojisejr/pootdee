@@ -49,6 +49,15 @@ export interface CreatePhraseInput {
   isBookmarked?: boolean
 }
 
+// Enhanced input interface for creating phrases with analysis data
+export interface EnhancedCreatePhraseInput extends CreatePhraseInput {
+  analysisData?: unknown
+  grammarAnalysis?: unknown
+  vocabularyAnalysis?: unknown
+  contextAnalysis?: unknown
+  analysisMetadata?: unknown
+}
+
 // Input interface for updating existing phrases
 export interface UpdatePhraseInput {
   englishPhrase?: string

@@ -7,7 +7,7 @@ import { useSavePhrase } from "./hooks/useSavePhrase";
 import { 
   AnalyzeRequest, 
   AnalyzeResponse, 
-  AnalyzerOutput,
+  EnhancedAnalyzerOutput,
   ERROR_MESSAGES, 
   ErrorType 
 } from "@/interfaces/langchain";
@@ -24,63 +24,40 @@ export default function Home() {
     userTranslation: "",
     context: "",
   });
-  const [isExpanded, setIsExpanded] = useState<boolean>(false);
-  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalyzerOutput | null>(null);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Use the save phrase hook
+  const [analysisResult, setAnalysisResult] = useState<EnhancedAnalyzerOutput | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showSaveButton, setShowSaveButton] = useState<boolean>(false);
+
   const { savePhrase, isSaving, error: saveError } = useSavePhrase();
 
-  // Clear validation error when user starts typing
-  useEffect(() => {
-    if (validationError && formData.englishPhrase.trim()) {
-      setValidationError(null);
-    }
-  }, [formData.englishPhrase, validationError]);
+  const handleInputChange = useCallback((field: keyof FormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setError(null);
+    setAnalysisResult(null);
+    setShowSaveButton(false);
+  }, []);
 
-  // Clear analysis results when input changes significantly
-  // Track previous englishPhrase to detect actual changes
-  const [previousEnglishPhrase, setPreviousEnglishPhrase] = useState<string>("");
-  
-  useEffect(() => {
-    const currentPhrase = formData.englishPhrase.trim();
-    
-    // Only clear results if the phrase actually changed (not just state update)
-    if (analysisResult && currentPhrase !== previousEnglishPhrase && currentPhrase !== "") {
+  const debouncedAnalyze = useDebouncedCallback(async (data: FormData) => {
+    if (!data.englishPhrase.trim()) {
       setAnalysisResult(null);
-      setAnalysisError(null);
-    }
-    
-    // Update previous phrase for next comparison
-    setPreviousEnglishPhrase(currentPhrase);
-  }, [formData.englishPhrase, analysisResult, previousEnglishPhrase]);
-
-  const handleInputChange = (field: keyof FormData, value: string): void => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  // Core analyze function without debouncing
-  const performAnalysis = useCallback(async (): Promise<void> => {
-    // Validation
-    if (!formData.englishPhrase.trim()) {
-      setValidationError(ERROR_MESSAGES[ErrorType.VALIDATION].description);
+      setIsLoading(false);
       return;
     }
 
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-    setValidationError(null);
-
     try {
-      const analyzeRequest: AnalyzeRequest = {
-        englishPhrase: formData.englishPhrase.trim(),
-        userTranslation: formData.userTranslation.trim(),
-        context: formData.context.trim(),
+      setIsLoading(true);
+      setError(null);
+
+      const requestData: AnalyzeRequest = {
+        englishPhrase: data.englishPhrase.trim(),
+        userTranslation: data.userTranslation.trim() || undefined,
+        context: data.context.trim() || undefined,
+        options: {
+          includeMetadata: true,
+          detailedAnalysis: true,
+        },
       };
 
       const response = await fetch("/api/analyze", {
@@ -88,50 +65,87 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(analyzeRequest),
+        body: JSON.stringify(requestData),
       });
 
-      const data: AnalyzeResponse = await response.json();
+      const responseData: AnalyzeResponse = await response.json();
 
       if (!response.ok) {
-        // Handle validation errors that might contain suggestions
-        if (response.status === 400 && data.error?.type === 'validation') {
-          // Check if this is a sentence filter rejection with suggestions
-          if (data.error.message && data.error.message.includes('grammatically incorrect')) {
-            // Extract the suggestion from the error message
-            const suggestionMatch = data.error.message.match(/It should be '([^']+)'/);
+        // Handle specific error cases
+        if (responseData.error && responseData.error.type === ErrorType.VALIDATION) {
+          if (responseData.error.message && responseData.error.message.includes('grammatically incorrect')) {
+            // Extract the suggestion from the responseData.error message
+            const suggestionMatch = responseData.error.message.match(/It should be '([^']+)'/);
             const suggestion = suggestionMatch ? suggestionMatch[1] : null;
             
             // Create a special analysis result for grammar corrections
-            const correctionResult: AnalyzerOutput = {
+            const correctionResult: EnhancedAnalyzerOutput = {
               correctness: "incorrect" as const,
               meaning: "ประโยคนี้มีไวยากรณ์ที่ไม่ถูกต้อง",
               alternatives: suggestion ? [suggestion] : [],
-              errors: data.error.message,
+              errors: responseData.error.message,
+              overallRating: 1,
+              severity: "high" as const,
+              friendlyHeadings: {
+                grammar: "ไวยากรณ์",
+                vocabulary: "คำศัพท์", 
+                context: "บริบท",
+                overall: "ผลรวม"
+              },
               grammarAnalysis: {
                 score: 0,
                 issues: [{
                   type: "other",
-                  description: data.error.message,
+                  description: responseData.error.message,
                   severity: "high",
                   suggestion: suggestion || "กรุณาตรวจสอบไวยากรณ์"
                 }],
                 strengths: [],
-                recommendations: suggestion ? [`ใช้ "${suggestion}" แทน`] : []
+                recommendations: suggestion ? [`ใช้ "${suggestion}" แทน`] : [],
+                structureComparison: {
+                  userStructure: formData.englishPhrase,
+                  correctStructure: suggestion || formData.englishPhrase,
+                  differences: [],
+                  similarity: 0.1,
+                  explanation: responseData.error.message
+                },
+                tenseAnalysis: {
+                  detectedTense: "simple_present" as const,
+                  correctTense: "simple_present" as const,
+                  isCorrect: true,
+                  explanation: "The sentence uses simple present tense correctly.",
+                  examples: ["I eat breakfast every morning.", "She works at a bank."],
+                  commonMistakes: ["Using 'am eating' instead of 'eat' for habitual actions."]
+                },
+                starRating: 1
               },
               vocabularyAnalysis: {
                 score: 50,
                 level: "beginner",
                 appropriateWords: [],
                 inappropriateWords: [],
-                suggestions: []
+                suggestions: [],
+                wordAnalysis: [],
+                starRating: 3,
+                phoneticBreakdown: {
+                  fullSentence: {
+                    ipa: "",
+                    simplified: "",
+                    syllableCount: 0
+                  },
+                  wordByWord: [],
+                  pronunciationTips: []
+                }
               },
               contextAnalysis: {
                 score: 50,
-                appropriateness: "neutral",
+                appropriateness: "appropriate" as const,
                 culturalNotes: [],
-                usageNotes: [],
-                situationalFit: "ต้องแก้ไขไวยากรณ์ก่อน"
+                improvements: [],
+                situationalFit: "ต้องแก้ไขไวยากรณ์ก่อน",
+                formality: "neutral" as const,
+                starRating: 2,
+                friendlyHeading: "บริบทและการใช้งาน"
               },
               confidence: 0.9,
               suggestions: suggestion ? [`ใช้ "${suggestion}" แทน`] : []
@@ -161,281 +175,222 @@ export default function Home() {
             errorType = ErrorType.NETWORK_ERROR;
         }
 
-        const errorMessage = data.error?.message || ERROR_MESSAGES[errorType].description;
-        throw new Error(errorMessage);
+        const errorMessage = responseData.error?.message || ERROR_MESSAGES[errorType].description;
+        setError(errorMessage);
+        return;
       }
 
-      if (!data.success || !data.data) {
-        throw new Error(ERROR_MESSAGES[ErrorType.API_ERROR].description);
-      }
-
-      setAnalysisResult(data.data);
-    } catch (error) {
-      console.error("ERROR: Analysis failed:", error);
-      
-      if (error instanceof Error) {
-        setAnalysisError(error.message);
+      if (responseData.success && responseData.data) {
+        setAnalysisResult(responseData.data);
+        setShowSaveButton(true);
       } else {
-        setAnalysisError(ERROR_MESSAGES[ErrorType.NETWORK_ERROR].description);
+        setError("ไม่สามารถวิเคราะห์ประโยคได้ กรุณาลองใหม่อีกครั้ง");
       }
+    } catch (err) {
+      console.error("Analysis error:", err);
+      setError(ERROR_MESSAGES[ErrorType.NETWORK_ERROR].description);
     } finally {
-      setIsAnalyzing(false);
+      setIsLoading(false);
     }
-  }, [formData.englishPhrase, formData.userTranslation, formData.context]);
+  }, 1000);
 
-  // Debounced analyze function (500ms delay)
-  const debouncedAnalyze = useDebouncedCallback(performAnalysis, 500);
-
-  // Handle analyze button click
-  const handleAnalyze = useCallback((): void => {
-    // Immediate validation feedback
-    if (!formData.englishPhrase.trim()) {
-      setValidationError(ERROR_MESSAGES[ErrorType.VALIDATION].description);
-      return;
+  useEffect(() => {
+    if (formData.englishPhrase.trim()) {
+      debouncedAnalyze(formData);
     }
-    
-    // Clear previous errors and trigger debounced analysis
-    setValidationError(null);
-    debouncedAnalyze();
-  }, [formData.englishPhrase, debouncedAnalyze]);
+  }, [formData, debouncedAnalyze]);
 
-  const handleSave = async (): Promise<void> => {
-    const success = await savePhrase(formData);
+  const handleSavePhrase = async () => {
+    if (!analysisResult) return;
 
-    if (success) {
-      console.log("INFO: Phrase saved successfully");
-      // Optionally clear form or show success message
-    } else {
-      console.log("ERROR: Failed to save phrase - error handled by hook");
-      // Error is already handled by the hook and displayed in UI
+    try {
+      await savePhrase({
+        englishPhrase: formData.englishPhrase,
+        userTranslation: formData.userTranslation,
+        context: formData.context,
+        analysisResult,
+      });
+      setShowSaveButton(false);
+    } catch (err) {
+      console.error("Save error:", err);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      <SignedOut>
-        <div className="h-screen w-full flex flex-col justify-center items-center px-4">
-          <div className="text-center space-y-6 max-w-md">
-            <h1 className="text-4xl lg:text-5xl font-bold text-primary">
-              POOTDEE
-            </h1>
-            <div className="space-y-2">
-              <p className="text-xl text-foreground">เรียนภาษาอังกฤษได้ง่าย</p>
-              <p className="text-xl text-foreground">จัดการประโยคอย่างฉลาด</p>
-            </div>
-            <SignInButton>
-              <button className="btn bg-gradient-to-r from-primary to-primary text-white px-8 py-4 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                เริ่มกันเลย !
-              </button>
-            </SignInButton>
-          </div>
+  const renderStarRating = (rating: number, label: string) => {
+    return (
+      <div className="flex items-center space-x-2">
+        <span className="text-sm font-medium text-gray-700">{label}:</span>
+        <div className="flex">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <svg
+              key={star}
+              className={`w-4 h-4 ${
+                star <= rating ? "text-yellow-400" : "text-gray-300"
+              }`}
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+          ))}
         </div>
-      </SignedOut>
+        <span className="text-sm text-gray-600">({rating}/5)</span>
+      </div>
+    );
+  };
 
-      <SignedIn>
-        <div className="container mx-auto px-4 py-8 max-w-2xl">
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-primary mb-2">POOTDEE</h1>
-            <p className="text-muted-foreground">
-              วิเคราะห์และจัดการประโยคภาษาอังกฤษ
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+              English Analysis Tool
+            </h1>
+            <p className="text-lg text-gray-600">
+              วิเคราะห์ประโยคภาษาอังกฤษของคุณและเรียนรู้ไปพร้อมกัน
             </p>
           </div>
 
-          <div className="space-y-6">
-            {/* Main English Phrase Input */}
-            <div>
-              <label
-                htmlFor="englishPhrase"
-                className="block text-sm font-medium text-foreground mb-2"
-              >
-                English Phrase
-              </label>
-              <textarea
-                id="englishPhrase"
-                value={formData.englishPhrase}
-                onChange={(e) =>
-                  handleInputChange("englishPhrase", e.target.value)
-                }
-                placeholder="Enter your English phrase..."
-                className="w-full min-h-[120px] p-5 border-2 border-border rounded-2xl text-base leading-relaxed resize-vertical transition-colors focus:border-primary focus:outline-none bg-background"
-                disabled={isAnalyzing || isSaving}
-              />
+          {/* Authentication Check */}
+          <SignedOut>
+            <div className="bg-white rounded-lg shadow-md p-6 text-center">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                กรุณาเข้าสู่ระบบเพื่อใช้งาน
+              </h2>
+              <SignInButton mode="modal">
+                <button className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                  เข้าสู่ระบบ
+                </button>
+              </SignInButton>
             </div>
+          </SignedOut>
 
-            {/* Expandable Additional Fields */}
-            {!isExpanded && (
-              <button
-                onClick={() => setIsExpanded(true)}
-                className="w-full p-3 border-2 border-dashed border-muted-foreground rounded-lg text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-                disabled={isAnalyzing || isSaving}
-              >
-                + เพิ่มข้อมูล
-              </button>
-            )}
-
-            {isExpanded && (
-              <div className="space-y-4 animate-in">
-                {/* User Translation */}
+          <SignedIn>
+            {/* Input Form */}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+              <div className="space-y-4">
                 <div>
-                  <label
-                    htmlFor="userTranslation"
-                    className="block text-sm font-medium text-foreground mb-2"
-                  >
-                    คำแปลที่คิด
+                  <label htmlFor="englishPhrase" className="block text-sm font-medium text-gray-700 mb-2">
+                    ประโยคภาษาอังกฤษ *
                   </label>
-                  <textarea
+                  <input
+                    type="text"
+                    id="englishPhrase"
+                    value={formData.englishPhrase}
+                    onChange={(e) => handleInputChange("englishPhrase", e.target.value)}
+                    placeholder="กรอกประโยคภาษาอังกฤษที่ต้องการวิเคราะห์..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="userTranslation" className="block text-sm font-medium text-gray-700 mb-2">
+                    คำแปลของคุณ (ไม่บังคับ)
+                  </label>
+                  <input
+                    type="text"
                     id="userTranslation"
                     value={formData.userTranslation}
-                    onChange={(e) =>
-                      handleInputChange("userTranslation", e.target.value)
-                    }
-                    placeholder="ใส่คำแปลที่คุณคิดไว้..."
-                    className="w-full min-h-[100px] p-4 border-2 border-border rounded-xl text-base resize-vertical transition-colors focus:border-primary focus:outline-none bg-background"
-                    disabled={isAnalyzing || isSaving}
+                    onChange={(e) => handleInputChange("userTranslation", e.target.value)}
+                    placeholder="แปลประโยคนี้เป็นภาษาไทย..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
 
-                {/* Context Field */}
                 <div>
-                  <label
-                    htmlFor="context"
-                    className="block text-sm font-medium text-foreground mb-2"
-                  >
-                    บริบท (ใช้ตอนไหน?)
+                  <label htmlFor="context" className="block text-sm font-medium text-gray-700 mb-2">
+                    บริบทการใช้งาน (ไม่บังคับ)
                   </label>
-                  <textarea
+                  <input
+                    type="text"
                     id="context"
                     value={formData.context}
-                    onChange={(e) =>
-                      handleInputChange("context", e.target.value)
-                    }
-                    placeholder="บอกบริบทหรือสถานการณ์ที่จะใช้ประโยคนี้..."
-                    className="w-full min-h-[80px] p-4 border-2 border-border rounded-xl text-base resize-vertical transition-colors focus:border-primary focus:outline-none bg-background"
-                    disabled={isAnalyzing || isSaving}
+                    onChange={(e) => handleInputChange("context", e.target.value)}
+                    placeholder="บอกบริบทหรือสถานการณ์ที่ใช้ประโยคนี้..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
-
-                <button
-                  onClick={() => setIsExpanded(false)}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  disabled={isAnalyzing || isSaving}
-                >
-                  ซ่อนฟิลด์เพิ่มเติม
-                </button>
               </div>
-            )}
 
-            {/* Action Buttons */}
-            <div className="flex gap-4 pt-4">
-              <button
-                onClick={handleAnalyze}
-                disabled={
-                  isAnalyzing ||
-                  isSaving ||
-                  (!formData.englishPhrase.trim() &&
-                    !formData.userTranslation.trim())
-                }
-                className="flex-1 bg-gradient-to-r from-primary to-primary text-white py-4 px-6 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                {isAnalyzing ? "กำลังวิเคราะห์..." : "อธิบาย!"}
-              </button>
+              {/* Loading Indicator */}
+              {isLoading && (
+                <div className="mt-4 flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="ml-2 text-gray-600">กำลังวิเคราะห์...</span>
+                </div>
+              )}
 
-              <button
-                onClick={handleSave}
-                disabled={
-                  isAnalyzing ||
-                  isSaving ||
-                  (!formData.englishPhrase.trim() &&
-                    !formData.userTranslation.trim())
-                }
-                className="flex-1 bg-gradient-to-r from-accent to-accent text-white py-4 px-6 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                {isSaving ? "กำลังบันทึก..." : "เก็บ!"}
-              </button>
+              {/* Error Display */}
+              {error && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                  <p className="text-red-700">{error}</p>
+                </div>
+              )}
             </div>
 
-            {/* Validation Error Display */}
-            {validationError && (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-                <p className="text-yellow-600 text-sm font-medium">
-                  ⚠️ ข้อมูลไม่ถูกต้อง:
-                </p>
-                <p className="text-yellow-600 text-sm">{validationError}</p>
-              </div>
-            )}
-
-            {/* Analysis Error Display */}
-            {analysisError && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-                <p className="text-red-600 text-sm font-medium">
-                  ❌ เกิดข้อผิดพลาดในการวิเคราะห์:
-                </p>
-                <p className="text-red-600 text-sm">{analysisError}</p>
-              </div>
-            )}
-
-            {/* Enhanced Analysis Result Display */}
+            {/* Analysis Results */}
             {analysisResult && (
-              <div className="p-6 bg-green-50 border border-green-200 rounded-xl space-y-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">✅</span>
-                  <h3 className="text-lg font-semibold text-green-800">ผลการวิเคราะห์</h3>
-                  <span className="ml-auto text-sm text-green-600">
-                    ความมั่นใจ: {Math.round(analysisResult.confidence * 100)}%
-                  </span>
-                </div>
-                
-                {/* Correctness Status */}
-                <div className="p-4 bg-white rounded-lg border border-green-100">
-                  <h4 className="font-medium text-green-700 mb-2">ความถูกต้อง:</h4>
-                  <div className="flex items-center gap-2">
-                    {analysisResult.correctness === "correct" && (
-                      <>
-                        <span className="text-green-600">🎉</span>
-                        <span className="text-green-600 font-medium">ถูกต้อง</span>
-                      </>
-                    )}
-                    {analysisResult.correctness === "partially_correct" && (
-                      <>
-                        <span className="text-yellow-600">⚠️</span>
-                        <span className="text-yellow-600 font-medium">ถูกต้องบางส่วน</span>
-                      </>
-                    )}
-                    {analysisResult.correctness === "incorrect" && (
-                      <>
-                        <span className="text-red-600">❌</span>
-                        <span className="text-red-600 font-medium">ไม่ถูกต้อง</span>
-                      </>
-                    )}
-                  </div>
+              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">ผลการวิเคราะห์</h2>
+                  {renderStarRating(analysisResult.overallRating, "คะแนนรวม")}
                 </div>
 
-                {/* Meaning */}
-                <div className="p-4 bg-white rounded-lg border border-green-100">
-                  <h4 className="font-medium text-green-700 mb-2">ความหมาย:</h4>
+                {/* Overall Assessment */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center mb-2">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      analysisResult.correctness === "correct" 
+                        ? "bg-green-100 text-green-800"
+                        : analysisResult.correctness === "partially_correct"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-red-100 text-red-800"
+                    }`}>
+                      {analysisResult.correctness === "correct" ? "ถูกต้อง" : 
+                       analysisResult.correctness === "partially_correct" ? "ถูกต้องบางส่วน" : "ไม่ถูกต้อง"}
+                    </span>
+                    <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      analysisResult.severity === "low" 
+                        ? "bg-blue-100 text-blue-800"
+                        : analysisResult.severity === "medium"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-red-100 text-red-800"
+                    }`}>
+                      {analysisResult.severity === "low" ? "ระดับต่ำ" : 
+                       analysisResult.severity === "medium" ? "ระดับกลาง" : 
+                       analysisResult.severity === "high" ? "ระดับสูง" : "ระดับวิกฤต"}
+                    </span>
+                  </div>
                   <p className="text-gray-700">{analysisResult.meaning}</p>
                 </div>
 
                 {/* Grammar Analysis */}
-                <div className="p-4 bg-white rounded-lg border border-green-100">
-                  <h4 className="font-medium text-green-700 mb-2">
-                    การวิเคราะห์ไวยากรณ์ (คะแนน: {analysisResult.grammarAnalysis.score}/100)
-                  </h4>
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900">{analysisResult.friendlyHeadings.grammar}</h3>
+                    {renderStarRating(analysisResult.grammarAnalysis.starRating, "ไวยากรณ์")}
+                  </div>
                   
                   {analysisResult.grammarAnalysis.issues.length > 0 && (
-                    <div className="mb-3">
-                      <h5 className="text-sm font-medium text-red-600 mb-1">ปัญหาที่พบ:</h5>
-                      <ul className="space-y-1">
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-900 mb-2">ปัญหาที่พบ:</h4>
+                      <ul className="space-y-2">
                         {analysisResult.grammarAnalysis.issues.map((issue, index) => (
-                          <li key={index} className="text-sm text-red-600 flex items-start gap-2">
-                            <span className="text-red-500 mt-1">•</span>
-                            <div>
-                              <span className="font-medium">{issue.description}</span>
-                              {issue.suggestion && (
-                                <div className="text-green-600 text-xs mt-1">
-                                  💡 {issue.suggestion}
-                                </div>
-                              )}
+                          <li key={index} className="p-3 bg-red-50 border border-red-200 rounded-md">
+                            <div className="flex items-start">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mr-2 ${
+                                issue.severity === "high" ? "bg-red-100 text-red-800" :
+                                issue.severity === "medium" ? "bg-yellow-100 text-yellow-800" :
+                                "bg-blue-100 text-blue-800"
+                              }`}>
+                                {issue.severity === "high" ? "สูง" : issue.severity === "medium" ? "กลาง" : "ต่ำ"}
+                              </span>
+                              <div>
+                                <p className="text-gray-900">{issue.description}</p>
+                                <p className="text-sm text-gray-600 mt-1">แนะนำ: {issue.suggestion}</p>
+                              </div>
                             </div>
                           </li>
                         ))}
@@ -444,13 +399,13 @@ export default function Home() {
                   )}
 
                   {analysisResult.grammarAnalysis.strengths.length > 0 && (
-                    <div className="mb-3">
-                      <h5 className="text-sm font-medium text-green-600 mb-1">จุดแข็ง:</h5>
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-900 mb-2">จุดเด่น:</h4>
                       <ul className="space-y-1">
                         {analysisResult.grammarAnalysis.strengths.map((strength, index) => (
-                          <li key={index} className="text-sm text-green-600 flex items-start gap-2">
-                            <span className="text-green-500 mt-1">✓</span>
-                            <span>{strength}</span>
+                          <li key={index} className="text-sm text-green-700 flex items-start">
+                            <span className="text-green-500 mr-2">✓</span>
+                            {strength}
                           </li>
                         ))}
                       </ul>
@@ -458,13 +413,13 @@ export default function Home() {
                   )}
 
                   {analysisResult.grammarAnalysis.recommendations.length > 0 && (
-                    <div>
-                      <h5 className="text-sm font-medium text-blue-600 mb-1">ำแนะนำ:</h5>
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-900 mb-2">คำแนะนำ:</h4>
                       <ul className="space-y-1">
                         {analysisResult.grammarAnalysis.recommendations.map((rec, index) => (
-                          <li key={index} className="text-sm text-blue-600 flex items-start gap-2">
-                            <span className="text-blue-500 mt-1">💡</span>
-                            <span>{rec}</span>
+                          <li key={index} className="text-sm text-blue-700 flex items-start">
+                            <span className="text-blue-500 mr-2">•</span>
+                            {rec}
                           </li>
                         ))}
                       </ul>
@@ -473,65 +428,89 @@ export default function Home() {
                 </div>
 
                 {/* Vocabulary Analysis */}
-                <div className="p-4 bg-white rounded-lg border border-green-100">
-                  <h4 className="font-medium text-green-700 mb-2">
-                    การวิเคราะห์คำศัพท์ (คะแนน: {analysisResult.vocabularyAnalysis.score}/100)
-                  </h4>
-                  <p className="text-sm text-gray-600 mb-2">
-                    ระดับ: <span className="font-medium">{analysisResult.vocabularyAnalysis.level}</span>
-                  </p>
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900">{analysisResult.friendlyHeadings.vocabulary}</h3>
+                    {renderStarRating(analysisResult.vocabularyAnalysis.starRating, "คำศัพท์")}
+                  </div>
+                  
+                  <div className="mb-3">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      ระดับ: {analysisResult.vocabularyAnalysis.level === "beginner" ? "เริ่มต้น" : 
+                              analysisResult.vocabularyAnalysis.level === "intermediate" ? "กลาง" : "สูง"}
+                    </span>
+                  </div>
 
-                  {analysisResult.vocabularyAnalysis.suggestions.length > 0 && (
-                    <div>
-                      <h5 className="text-sm font-medium text-blue-600 mb-1">คำแนะนำคำศัพท์:</h5>
-                      <ul className="space-y-1">
-                        {analysisResult.vocabularyAnalysis.suggestions.map((suggestion, index) => (
-                          <li key={index} className="text-sm text-blue-600 flex items-start gap-2">
-                            <span className="text-blue-500 mt-1">💡</span>
-                            <div>
-                              <span className="font-medium">{suggestion.original}</span> → 
-                              <span className="font-medium text-green-600"> {suggestion.suggested}</span>
-                              <div className="text-xs text-gray-600 mt-1">{suggestion.reason}</div>
+                  {analysisResult.vocabularyAnalysis.wordAnalysis.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-900 mb-2">การวิเคราะห์คำศัพท์:</h4>
+                      <div className="space-y-3">
+                        {analysisResult.vocabularyAnalysis.wordAnalysis.map((word, index) => (
+                          <div key={index} className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-blue-900">{word.word}</span>
+                              <span className="text-xs text-blue-600">{word.partOfSpeech.primary}</span>
                             </div>
-                          </li>
+                            <p className="text-sm text-gray-700 mb-1">{word.meaning}</p>
+                            <p className="text-xs text-gray-600">{word.usage}</p>
+                            {word.phonetics && (
+                              <div className="mt-2 text-xs text-gray-500">
+                                การออกเสียง: {word.phonetics.simplified} ({word.phonetics.ipa})
+                              </div>
+                            )}
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     </div>
                   )}
                 </div>
 
                 {/* Context Analysis */}
-                <div className="p-4 bg-white rounded-lg border border-green-100">
-                  <h4 className="font-medium text-green-700 mb-2">
-                    การวิเคราะห์บริบท (คะแนน: {analysisResult.contextAnalysis.score}/100)
-                  </h4>
-                  <p className="text-sm text-gray-600 mb-2">
-                    ความเหมาะสม: <span className="font-medium">{analysisResult.contextAnalysis.appropriateness}</span>
-                  </p>
-                  <p className="text-sm text-gray-700 mb-2">{analysisResult.contextAnalysis.situationalFit}</p>
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900">{analysisResult.friendlyHeadings.context}</h3>
+                    {renderStarRating(analysisResult.contextAnalysis.starRating, "บริบท")}
+                  </div>
+                  
+                  <div className="mb-3">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      ความเหมาะสม: {analysisResult.contextAnalysis.appropriateness === "very_appropriate" ? "เหมาะสมมาก" :
+                                    analysisResult.contextAnalysis.appropriateness === "appropriate" ? "เหมาะสม" :
+                                    analysisResult.contextAnalysis.appropriateness === "somewhat_appropriate" ? "เหมาะสมบ้าง" :
+                                    analysisResult.contextAnalysis.appropriateness === "inappropriate" ? "ไม่เหมาะสม" : "ไม่เหมาะสมมาก"}
+                    </span>
+                    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      ความเป็นทางการ: {analysisResult.contextAnalysis.formality === "very_formal" ? "เป็นทางการมาก" :
+                                      analysisResult.contextAnalysis.formality === "formal" ? "เป็นทางการ" :
+                                      analysisResult.contextAnalysis.formality === "neutral" ? "กลาง" :
+                                      analysisResult.contextAnalysis.formality === "informal" ? "ไม่เป็นทางการ" : "ไม่เป็นทางการมาก"}
+                    </span>
+                  </div>
 
-                  {analysisResult.contextAnalysis.usageNotes.length > 0 && (
-                    <div className="mb-2">
-                      <h5 className="text-sm font-medium text-blue-600 mb-1">หมายเหตุการใช้:</h5>
+                  <p className="text-gray-700 mb-3">{analysisResult.contextAnalysis.situationalFit}</p>
+
+                  {analysisResult.contextAnalysis.culturalNotes.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-900 mb-2">หมายเหตุทางวัฒนธรรม:</h4>
                       <ul className="space-y-1">
-                        {analysisResult.contextAnalysis.usageNotes.map((note, index) => (
-                          <li key={index} className="text-sm text-blue-600 flex items-start gap-2">
-                            <span className="text-blue-500 mt-1">📝</span>
-                            <span>{note}</span>
+                        {analysisResult.contextAnalysis.culturalNotes.map((note, index) => (
+                          <li key={index} className="text-sm text-gray-600 flex items-start">
+                            <span className="text-purple-500 mr-2">•</span>
+                            {note}
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
 
-                  {analysisResult.contextAnalysis.culturalNotes.length > 0 && (
-                    <div>
-                      <h5 className="text-sm font-medium text-purple-600 mb-1">หมายเหตุทางวัฒนธรรม:</h5>
+                  {analysisResult.contextAnalysis.improvements.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-900 mb-2">ข้อเสนอแนะ:</h4>
                       <ul className="space-y-1">
-                        {analysisResult.contextAnalysis.culturalNotes.map((note, index) => (
-                          <li key={index} className="text-sm text-purple-600 flex items-start gap-2">
-                            <span className="text-purple-500 mt-1">🌍</span>
-                            <span>{note}</span>
+                        {analysisResult.contextAnalysis.improvements.map((improvement, index) => (
+                          <li key={index} className="text-sm text-gray-600 flex items-start">
+                            <span className="text-blue-500 mr-2">•</span>
+                            {improvement}
                           </li>
                         ))}
                       </ul>
@@ -540,62 +519,54 @@ export default function Home() {
                 </div>
 
                 {/* Alternatives */}
-                {analysisResult.alternatives && analysisResult.alternatives.length > 0 && (
-                  <div className="p-4 bg-white rounded-lg border border-green-100">
-                    <h4 className="font-medium text-green-700 mb-2">ทางเลือกอื่น:</h4>
-                    <ul className="space-y-1">
-                      {analysisResult.alternatives.map((alternative, index) => (
-                        <li key={index} className="text-gray-700 flex items-start gap-2">
-                          <span className="text-green-600 mt-1">•</span>
-                          <span>{alternative}</span>
+                {analysisResult.alternatives.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">ทางเลือกอื่น:</h3>
+                    <ul className="space-y-2">
+                      {analysisResult.alternatives.map((alt, index) => (
+                        <li key={index} className="p-3 bg-green-50 border border-green-200 rounded-md">
+                          <span className="text-green-800 font-medium">{alt}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
                 )}
 
-                {/* General Suggestions */}
-                {analysisResult.suggestions && analysisResult.suggestions.length > 0 && (
-                  <div className="p-4 bg-white rounded-lg border border-green-100">
-                    <h4 className="font-medium text-green-700 mb-2">คำแนะนำทั่วไป:</h4>
+                {/* Suggestions */}
+                {analysisResult.suggestions.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">คำแนะนำเพิ่มเติม:</h3>
                     <ul className="space-y-1">
                       {analysisResult.suggestions.map((suggestion, index) => (
-                        <li key={index} className="text-gray-700 flex items-start gap-2">
-                          <span className="text-blue-600 mt-1">💡</span>
-                          <span>{suggestion}</span>
+                        <li key={index} className="text-sm text-gray-600 flex items-start">
+                          <span className="text-blue-500 mr-2">💡</span>
+                          {suggestion}
                         </li>
                       ))}
                     </ul>
                   </div>
                 )}
 
-                {/* Errors/Additional Info */}
-                {analysisResult.errors && (
-                  <div className="p-4 bg-white rounded-lg border border-green-100">
-                    <h4 className="font-medium text-green-700 mb-2">ข้อมูลเพิ่มเติม:</h4>
-                    <p className="text-gray-700">{analysisResult.errors}</p>
+                {/* Save Button */}
+                {showSaveButton && (
+                  <div className="mt-6 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={handleSavePhrase}
+                      disabled={isSaving}
+                      className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                    >
+                      {isSaving ? "กำลังบันทึก..." : "บันทึกประโยคนี้"}
+                    </button>
+                    {saveError && (
+                      <p className="mt-2 text-sm text-red-600">{saveError}</p>
+                    )}
                   </div>
                 )}
               </div>
             )}
-
-            {/* Save Error Display */}
-            {saveError && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-                <p className="text-red-600 text-sm font-medium">
-                  ❌ เกิดข้อผิดพลาดในการบันทึก:
-                </p>
-                <p className="text-red-600 text-sm">{saveError}</p>
-              </div>
-            )}
-
-            {/* Help Text */}
-            <p className="text-sm text-muted-foreground text-center">
-              กรอกประโยคภาษาอังกฤษหรือคำแปลอย่างน้อย 1 ฟิลด์เพื่อเริ่มใช้งาน
-            </p>
-          </div>
+          </SignedIn>
         </div>
-      </SignedIn>
+      </div>
     </div>
   );
 }

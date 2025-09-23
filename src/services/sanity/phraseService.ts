@@ -18,7 +18,7 @@ import {
 } from '@/sanity/lib/queries'
 import {
   type Phrase,
-  type CreatePhraseInput,
+  type EnhancedCreatePhraseInput,
   type UpdatePhraseInput,
   type PhraseResponse,
   type PhrasesResponse,
@@ -38,7 +38,7 @@ export class PhraseService {
   /**
    * Create a new phrase with enhanced analysis data
    */
-  static async createPhrase(input: CreatePhraseInput): Promise<PhraseResponse> {
+  static async createPhrase(input: EnhancedCreatePhraseInput): Promise<PhraseResponse> {
     const startTime = Date.now()
     
     try {
@@ -47,7 +47,7 @@ export class PhraseService {
         action: 'createPhrase',
         metadata: {
           userId: input.userId,
-          hasAnalysisData: !!(input as any).analysisData,
+          hasAnalysisData: !!input.analysisData,
           phraseLength: input.englishPhrase?.length || 0
         }
       })
@@ -101,13 +101,13 @@ export class PhraseService {
         isBookmarked: input.isBookmarked || false,
         reviewCount: 0,
         // Enhanced analysis data from new schema
-        ...(input as any).analysisData && {
-          analysisData: (input as any).analysisData,
-          grammarAnalysis: (input as any).grammarAnalysis,
-          vocabularyAnalysis: (input as any).vocabularyAnalysis,
-          contextAnalysis: (input as any).contextAnalysis,
-          analysisMetadata: (input as any).analysisMetadata
-        }
+        ...(input.analysisData ? {
+          analysisData: input.analysisData,
+          grammarAnalysis: input.grammarAnalysis,
+          vocabularyAnalysis: input.vocabularyAnalysis,
+          contextAnalysis: input.contextAnalysis,
+          analysisMetadata: input.analysisMetadata
+        } : {})
       }
       
       const result = await writeClient.create(phraseDoc)
@@ -124,7 +124,7 @@ export class PhraseService {
           phraseId: result._id,
           userId: input.userId,
           processingTime,
-          hasAnalysisData: !!(input as any).analysisData
+          hasAnalysisData: !!input.analysisData
         }
       })
       
@@ -214,7 +214,7 @@ export class PhraseService {
           phraseId,
           userId,
           processingTime,
-          hasAnalysisData: !!(result as any).analysisData
+          hasAnalysisData: !!(result as Phrase).analysis
         }
       })
       
