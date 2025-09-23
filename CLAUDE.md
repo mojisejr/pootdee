@@ -173,6 +173,16 @@ This project uses a Two-Issue Pattern to separate work context from actionable p
 
 These commands are standard across all projects and streamline our communication with **AUTOMATED WORKFLOW INTEGRATION**.
 
+### Shortcut Commands
+
+... (ส่วนคำสั่งเดิมของคุณ)
+
+- **`=update-kb`**: **CRITICAL KNOWLEDGE BASE UPDATE WORKFLOW** - Instructs the agent to update the project's **Shared Knowledge Base** file (`project_status.md` or `project_state.json`) with the latest architectural, UI, and functionality details. This command ensures persistent context and prevents a loss of project memory.
+  1.  **Context Analysis**: Analyze the latest code changes, UI components, and system functionality.
+  2.  **File Update**: Overwrite the existing knowledge base file with the new, comprehensive snapshot of the project's state.
+  3.  **Synchronization**: Ensure the updated file is ready for all other agents and developers to read before any new implementation begins.
+      **MANDATORY RULE**: This command **MUST** be executed after every successful implementation (`=impl`) to ensure the project's state is always synchronized.
+
 - **`=fcs > [message]`**: Updates the `current-focus.md` file on the local machine and creates a **GitHub Context Issue** with the specified `[message]` as the title. **WARNING**: This command will only work if there are no open GitHub issues. If there are, the agent will alert you to clear the backlog before you can save a new context. To bypass this check, use the command `=fcs -f > [message]`.
 
 - **`=plan > [question/problem]`**: Creates a **GitHub Task Issue** with a detailed and comprehensive plan of action. **STAGING-FIRST WORKFLOW & CONFLICT PREVENTION** - The agent will:
