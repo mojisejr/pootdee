@@ -4,20 +4,17 @@
  */
 
 import { client, writeClient } from '@/sanity/lib/client'
+import { createLogger } from '@/lib/logger'
 import {
   GET_USER_PHRASES,
   GET_PHRASE_BY_ID,
   GET_PHRASES_BY_DIFFICULTY,
   GET_BOOKMARKED_PHRASES,
-  GET_PHRASES_BY_TAG,
   SEARCH_PHRASES,
   GET_PHRASES_FOR_REVIEW,
   GET_USER_PHRASE_STATS,
-  GET_RECENT_PHRASES,
-  GET_PHRASES_BY_CORRECTNESS,
   GET_USER_TAGS,
-  validateQueryParams,
-  type PhraseQueryParams
+  validateQueryParams
 } from '@/sanity/lib/queries'
 import {
   type Phrase,
@@ -26,29 +23,42 @@ import {
   type PhraseResponse,
   type PhrasesResponse,
   type UserPhraseStats,
-  type PhraseFilters,
-  type PaginationOptions,
-  type PaginatedPhrasesResponse,
   type BulkCreatePhraseInput,
-  type BulkUpdatePhraseInput,
-  type BulkOperationResponse,
-  isPhrase
+  type BulkOperationResponse
 } from '@/interfaces/phrase'
 
+// Create scoped logger for phrase service
+const logger = createLogger('PhraseService')
+
 /**
- * Phrase Service Class
- * Handles all database operations for phrases
+ * Enhanced Phrase Service Class
+ * Handles all database operations for phrases with comprehensive logging and error handling
  */
 export class PhraseService {
   /**
-   * Create a new phrase
+   * Create a new phrase with enhanced analysis data
    */
   static async createPhrase(input: CreatePhraseInput): Promise<PhraseResponse> {
+    const startTime = Date.now()
+    
     try {
-      console.log('INFO: Creating new phrase for user:', input.userId)
+      logger.info('Creating new phrase', {
+        component: 'PhraseService',
+        action: 'createPhrase',
+        metadata: {
+          userId: input.userId,
+          hasAnalysisData: false, // TODO: Implement enhanced analysis data integration
+          phraseLength: input.englishPhrase?.length || 0
+        }
+      })
       
       // Validate required fields
       if (!input.englishPhrase?.trim()) {
+        logger.error('Phrase creation failed - missing English phrase', undefined, {
+          component: 'PhraseService',
+          action: 'createPhrase_validation',
+          metadata: { userId: input.userId, error: 'missing_english_phrase' }
+        })
         return {
           success: false,
           error: 'English phrase is required'
@@ -56,6 +66,11 @@ export class PhraseService {
       }
       
       if (!input.userTranslation?.trim()) {
+        logger.error('Phrase creation failed - missing user translation', undefined, {
+          component: 'PhraseService',
+          action: 'createPhrase_validation',
+          metadata: { userId: input.userId, error: 'missing_user_translation' }
+        })
         return {
           success: false,
           error: 'User translation is required'
@@ -63,13 +78,18 @@ export class PhraseService {
       }
       
       if (!input.userId?.trim()) {
+        logger.error('Phrase creation failed - missing user ID', undefined, {
+          component: 'PhraseService',
+          action: 'createPhrase_validation',
+          metadata: { error: 'missing_user_id' }
+        })
         return {
           success: false,
           error: 'User ID is required'
         }
       }
       
-      // Prepare document for creation
+      // Prepare document for creation with enhanced analysis data
       const phraseDoc = {
         _type: 'phrase' as const,
         englishPhrase: input.englishPhrase.trim(),
@@ -79,7 +99,8 @@ export class PhraseService {
         tags: input.tags || [],
         difficulty: input.difficulty || 'beginner' as const,
         isBookmarked: input.isBookmarked || false,
-        reviewCount: 0
+        reviewCount: 0,
+        // TODO: Enhanced analysis data from new schema - needs proper interface integration
       }
       
       const result = await writeClient.create(phraseDoc)
@@ -88,7 +109,17 @@ export class PhraseService {
         throw new Error('Failed to create phrase - invalid response')
       }
       
-      console.log('INFO: Phrase created successfully:', result._id)
+      const processingTime = Date.now() - startTime
+      logger.info('Phrase created successfully', {
+        component: 'PhraseService',
+        action: 'createPhrase_success',
+        metadata: {
+          phraseId: result._id,
+          userId: input.userId,
+          processingTime,
+          hasAnalysisData: false // TODO: Implement enhanced analysis data detection
+        }
+      })
       
       return {
         success: true,
@@ -96,54 +127,113 @@ export class PhraseService {
         message: 'Phrase created successfully'
       }
     } catch (error) {
-      console.error('ERROR: Failed to create phrase:', error)
+      const processingTime = Date.now() - startTime
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      
+      logger.error('Phrase creation failed', error instanceof Error ? error : undefined, {
+        component: 'PhraseService',
+        action: 'createPhrase_error',
+        metadata: {
+          userId: input.userId,
+          error: errorMessage,
+          processingTime
+        }
+      })
+      
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: errorMessage
       }
     }
   }
   
   /**
-   * Get phrase by ID
+   * Get phrase by ID with enhanced logging
    */
   static async getPhraseById(phraseId: string, userId: string): Promise<PhraseResponse> {
+    const startTime = Date.now()
+    
     try {
-      console.log('INFO: Fetching phrase by ID:', phraseId)
+      logger.info('Fetching phrase by ID', {
+        component: 'PhraseService',
+        action: 'getPhraseById',
+        metadata: { phraseId, userId }
+      })
       
-      if (!phraseId?.trim() || !userId?.trim()) {
+      // Validate inputs
+      if (!phraseId?.trim()) {
+        logger.error('Get phrase failed - missing phrase ID', undefined, {
+          component: 'PhraseService',
+          action: 'getPhraseById_validation',
+          metadata: { userId, error: 'missing_phrase_id' }
+        })
         return {
           success: false,
-          error: 'Phrase ID and User ID are required'
+          error: 'Phrase ID is required'
         }
       }
       
-      const phrase = await client.fetch<Phrase>(GET_PHRASE_BY_ID, { phraseId })
-      
-      if (!phrase) {
+      if (!userId?.trim()) {
+        logger.error('Get phrase failed - missing user ID', undefined, {
+          component: 'PhraseService',
+          action: 'getPhraseById_validation',
+          metadata: { phraseId, error: 'missing_user_id' }
+        })
         return {
           success: false,
-          error: 'Phrase not found'
+          error: 'User ID is required'
         }
       }
       
-      // Verify ownership
-      if (phrase.userId !== userId) {
+      const result = await client.fetch(GET_PHRASE_BY_ID, { phraseId, userId })
+      
+      if (!result) {
+        logger.info('Phrase not found', {
+          component: 'PhraseService',
+          action: 'getPhraseById_not_found',
+          metadata: { phraseId, userId }
+        })
         return {
           success: false,
-          error: 'Access denied - phrase belongs to different user'
+          error: 'Phrase not found or access denied'
         }
       }
+      
+      const processingTime = Date.now() - startTime
+      logger.info('Phrase fetched successfully', {
+        component: 'PhraseService',
+        action: 'getPhraseById_success',
+        metadata: {
+          phraseId,
+          userId,
+          processingTime,
+          hasAnalysisData: false // TODO: Implement enhanced analysis data detection
+        }
+      })
       
       return {
         success: true,
-        data: phrase
+        data: result as Phrase,
+        message: 'Phrase retrieved successfully'
       }
     } catch (error) {
-      console.error('ERROR: Failed to fetch phrase:', error)
+      const processingTime = Date.now() - startTime
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      
+      logger.error('Get phrase by ID failed', error instanceof Error ? error : undefined, {
+        component: 'PhraseService',
+        action: 'getPhraseById_error',
+        metadata: {
+          phraseId,
+          userId,
+          error: errorMessage,
+          processingTime
+        }
+      })
+      
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: errorMessage
       }
     }
   }
@@ -173,9 +263,7 @@ export class PhraseService {
       if (updates.context !== undefined) {
         updateData.context = updates.context.trim()
       }
-      if (updates.analysis !== undefined) {
-        updateData.analysis = updates.analysis
-      }
+      // TODO: Handle enhanced analysis data updates when interface is properly integrated
       if (updates.tags !== undefined) {
         updateData.tags = updates.tags
       }

@@ -35,13 +35,13 @@ const requiredEnvVars: EnvCheck[] = [
   },
   {
     name: 'GOOGLE_AI_API_KEY',
-    required: false,
-    description: 'Google AI API key for AI features'
+    required: true,
+    description: 'Google AI API key for LangChain AI analysis features'
   },
   {
     name: 'OPENAI_API_KEY',
     required: false,
-    description: 'OpenAI API key for AI features'
+    description: 'OpenAI API key for alternative AI provider (optional)'
   }
 ];
 
