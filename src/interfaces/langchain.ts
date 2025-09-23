@@ -85,13 +85,36 @@ export interface AnalyzerOutput {
   contextAnalysis: ContextAnalysis;
   confidence: number;
   suggestions: string[];
+  
+  // Overall rating
+  overallStarRating: number; // 1-5 stars (average of component ratings)
 }
 
 export interface GrammarAnalysis {
   score: number; // 0-100
+  starRating: number; // 1-5 stars
   issues: GrammarIssue[];
   strengths: string[];
   recommendations: string[];
+  tenseAnalysis: TenseAnalysis;
+  structureAnalysis: StructureAnalysis;
+  complexity: "simple" | "medium" | "complex";
+}
+
+export interface TenseAnalysis {
+  detectedTense: string; // e.g., "Present Perfect", "Past Simple"
+  isCorrect: boolean;
+  explanation: string; // Thai explanation
+  alternatives: string[]; // alternative tense suggestions
+  usage: string; // Thai explanation of when to use this tense
+}
+
+export interface StructureAnalysis {
+  pattern: string; // e.g., "Subject + Verb + Object"
+  isNatural: boolean;
+  explanation: string; // Thai explanation
+  improvements: string[]; // Thai suggestions for improvement
+  comparison: string; // Thai comparison with Thai sentence structure
 }
 
 export interface GrammarIssue {
@@ -107,10 +130,31 @@ export interface GrammarIssue {
 
 export interface VocabularyAnalysis {
   score: number; // 0-100
+  starRating: number; // 1-5 stars
   level: "beginner" | "intermediate" | "advanced";
   appropriateWords: string[];
   inappropriateWords: string[];
   suggestions: VocabularySuggestion[];
+  wordBreakdown: WordAnalysis[];
+  overallDifficulty: "easy" | "medium" | "hard";
+}
+
+export interface WordAnalysis {
+  word: string;
+  position: {
+    start: number;
+    end: number;
+  };
+  partOfSpeech: string;
+  difficulty: "easy" | "medium" | "hard";
+  phonics: {
+    pronunciation: string; // IPA notation
+    syllables: string[];
+    stress: number[]; // syllable stress pattern
+  };
+  meaning: string; // Thai explanation
+  commonUsage: string; // Thai explanation of common usage
+  alternatives: string[]; // simpler alternatives
 }
 
 export interface VocabularySuggestion {
@@ -122,6 +166,7 @@ export interface VocabularySuggestion {
 
 export interface ContextAnalysis {
   score: number; // 0-100
+  starRating: number; // 1-5 stars
   appropriateness: "formal" | "informal" | "neutral";
   culturalNotes: string[];
   usageNotes: string[];
@@ -246,11 +291,31 @@ export const GrammarIssueSchema = z.object({
   }).optional(),
 });
 
+export const TenseAnalysisSchema = z.object({
+  detectedTense: z.string(),
+  isCorrect: z.boolean(),
+  explanation: z.string(),
+  alternatives: z.array(z.string()),
+  usage: z.string(),
+});
+
+export const StructureAnalysisSchema = z.object({
+  pattern: z.string(),
+  isNatural: z.boolean(),
+  explanation: z.string(),
+  improvements: z.array(z.string()),
+  comparison: z.string(),
+});
+
 export const GrammarAnalysisSchema = z.object({
   score: z.number().min(0).max(100),
+  starRating: z.number().min(1).max(5),
   issues: z.array(GrammarIssueSchema),
   strengths: z.array(z.string()),
   recommendations: z.array(z.string()),
+  tenseAnalysis: TenseAnalysisSchema,
+  structureAnalysis: StructureAnalysisSchema,
+  complexity: z.enum(["simple", "medium", "complex"]),
 });
 
 // Vocabulary Analysis Schemas
@@ -261,17 +326,41 @@ export const VocabularySuggestionSchema = z.object({
   context: z.string(),
 });
 
+export const PhonicsSchema = z.object({
+  pronunciation: z.string(),
+  syllables: z.array(z.string()),
+  stress: z.array(z.number()),
+});
+
+export const WordAnalysisSchema = z.object({
+  word: z.string(),
+  position: z.object({
+    start: z.number(),
+    end: z.number(),
+  }),
+  partOfSpeech: z.string(),
+  difficulty: z.enum(["easy", "medium", "hard"]),
+  phonics: PhonicsSchema,
+  meaning: z.string(),
+  commonUsage: z.string(),
+  alternatives: z.array(z.string()),
+});
+
 export const VocabularyAnalysisSchema = z.object({
   score: z.number().min(0).max(100),
+  starRating: z.number().min(1).max(5),
   level: z.enum(["beginner", "intermediate", "advanced"]),
   appropriateWords: z.array(z.string()),
   inappropriateWords: z.array(z.string()),
   suggestions: z.array(VocabularySuggestionSchema),
+  wordBreakdown: z.array(WordAnalysisSchema),
+  overallDifficulty: z.enum(["easy", "medium", "hard"]),
 });
 
 // Context Analysis Schema
 export const ContextAnalysisSchema = z.object({
   score: z.number().min(0).max(100),
+  starRating: z.number().min(1).max(5),
   appropriateness: z.enum(["formal", "informal", "neutral"]),
   culturalNotes: z.array(z.string()),
   usageNotes: z.array(z.string()),
@@ -326,6 +415,7 @@ export const AnalyzerOutputSchema = z.object({
   contextAnalysis: ContextAnalysisSchema,
   confidence: z.number().min(0).max(1),
   suggestions: z.array(z.string()),
+  overallStarRating: z.number().min(1).max(5),
 });
 
 // Enhanced Request/Response Schemas

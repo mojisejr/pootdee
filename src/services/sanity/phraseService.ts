@@ -47,7 +47,7 @@ export class PhraseService {
         action: 'createPhrase',
         metadata: {
           userId: input.userId,
-          hasAnalysisData: !!(input as any).analysisData,
+          hasAnalysisData: false, // TODO: Implement enhanced analysis data integration
           phraseLength: input.englishPhrase?.length || 0
         }
       })
@@ -100,14 +100,7 @@ export class PhraseService {
         difficulty: input.difficulty || 'beginner' as const,
         isBookmarked: input.isBookmarked || false,
         reviewCount: 0,
-        // Enhanced analysis data from new schema
-        ...(input as any).analysisData && {
-          analysisData: (input as any).analysisData,
-          grammarAnalysis: (input as any).grammarAnalysis,
-          vocabularyAnalysis: (input as any).vocabularyAnalysis,
-          contextAnalysis: (input as any).contextAnalysis,
-          analysisMetadata: (input as any).analysisMetadata
-        }
+        // TODO: Enhanced analysis data from new schema - needs proper interface integration
       }
       
       const result = await writeClient.create(phraseDoc)
@@ -124,7 +117,7 @@ export class PhraseService {
           phraseId: result._id,
           userId: input.userId,
           processingTime,
-          hasAnalysisData: !!(input as any).analysisData
+          hasAnalysisData: false // TODO: Implement enhanced analysis data detection
         }
       })
       
@@ -214,7 +207,7 @@ export class PhraseService {
           phraseId,
           userId,
           processingTime,
-          hasAnalysisData: !!(result as any).analysisData
+          hasAnalysisData: false // TODO: Implement enhanced analysis data detection
         }
       })
       
@@ -270,9 +263,7 @@ export class PhraseService {
       if (updates.context !== undefined) {
         updateData.context = updates.context.trim()
       }
-      if (updates.analysis !== undefined) {
-        updateData.analysis = updates.analysis
-      }
+      // TODO: Handle enhanced analysis data updates when interface is properly integrated
       if (updates.tags !== undefined) {
         updateData.tags = updates.tags
       }

@@ -49,7 +49,7 @@ class Logger {
     
     if (context) {
       const contextStr = Object.entries(context)
-        .filter(([_, value]) => value !== undefined)
+        .filter(([, value]) => value !== undefined)
         .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
         .join(' ');
       

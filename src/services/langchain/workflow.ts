@@ -1,13 +1,9 @@
 import { analyzerAgent } from './analyzer';
 import { 
   WorkflowState, 
-  AnalysisResult, 
   AnalysisMetadata,
-  SentenceFilterInput,
-  SentenceFilterOutput,
   AnalyzerInput,
-  AnalyzerOutput,
-  createAnalysisMetadata
+  AnalyzerOutput
 } from '../../interfaces/langchain';
 import { createLogger } from '../../lib/logger';
 
@@ -165,26 +161,47 @@ export class EnglishAnalysisWorkflow {
           errors: filterResult.filterError || 'Invalid input',
           grammarAnalysis: {
             score: 0,
+            starRating: 1,
             issues: [],
             strengths: [],
-            recommendations: []
+            recommendations: [],
+            tenseAnalysis: {
+              detectedTense: 'unknown',
+              isCorrect: false,
+              explanation: 'Cannot analyze invalid input',
+              alternatives: [],
+              usage: 'N/A'
+            },
+            structureAnalysis: {
+              pattern: 'unknown',
+              isNatural: false,
+              explanation: 'Cannot analyze invalid input',
+              improvements: [],
+              comparison: 'N/A'
+            },
+            complexity: 'simple' as const
           },
           vocabularyAnalysis: {
             score: 0,
+            starRating: 1,
             level: 'beginner',
             appropriateWords: [],
             inappropriateWords: [],
-            suggestions: []
+            suggestions: [],
+            wordBreakdown: [],
+            overallDifficulty: 'easy'
           },
           contextAnalysis: {
             score: 0,
+            starRating: 1,
             appropriateness: 'neutral',
             culturalNotes: [],
             usageNotes: [],
             situationalFit: 'Not applicable due to invalid input'
           },
           confidence: 0,
-          suggestions: ['Please provide a valid English phrase']
+          suggestions: ['Please provide a valid English phrase'],
+          overallStarRating: 1
         };
       }
 
@@ -263,26 +280,47 @@ export class EnglishAnalysisWorkflow {
         errors: errorMessage,
         grammarAnalysis: {
           score: 0,
+          starRating: 1,
           issues: [],
           strengths: [],
-          recommendations: []
+          recommendations: [],
+          tenseAnalysis: {
+            detectedTense: 'unknown',
+            isCorrect: false,
+            explanation: 'Cannot analyze due to error',
+            alternatives: [],
+            usage: 'N/A'
+          },
+          structureAnalysis: {
+            pattern: 'unknown',
+            isNatural: false,
+            explanation: 'Cannot analyze due to error',
+            improvements: [],
+            comparison: 'N/A'
+          },
+          complexity: 'simple' as const
         },
         vocabularyAnalysis: {
-          score: 0,
-          level: 'beginner',
-          appropriateWords: [],
-          inappropriateWords: [],
-          suggestions: []
-        },
-        contextAnalysis: {
-          score: 0,
+           score: 0,
+           starRating: 1,
+           level: 'beginner',
+           appropriateWords: [],
+           inappropriateWords: [],
+           suggestions: [],
+           wordBreakdown: [],
+           overallDifficulty: 'easy'
+         },
+         contextAnalysis: {
+           score: 0,
+           starRating: 1,
           appropriateness: 'neutral',
           culturalNotes: [],
           usageNotes: [],
           situationalFit: 'Not applicable due to error'
         },
         confidence: 0,
-        suggestions: ['Please try again with a different input']
+        suggestions: ['Please try again with a different input'],
+        overallStarRating: 1
       };
     }
   }
