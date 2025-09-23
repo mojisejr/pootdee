@@ -78,10 +78,14 @@ export default function Home() {
     setPreviousEnglishPhrase(currentPhrase);
   }, [formData.englishPhrase, analysisResult, previousEnglishPhrase]);
 
-  // Show save button when analysis is complete
+  // Show save button when there's data in either field (as per PRD requirement)
   useEffect(() => {
-    setShowSaveButton(!!analysisResult && !analysisError);
-  }, [analysisResult, analysisError]);
+    const hasEnglishPhrase = formData.englishPhrase.trim().length > 0;
+    const hasUserTranslation = formData.userTranslation.trim().length > 0;
+    
+    // Show save button if user has entered data in at least one field
+    setShowSaveButton(hasEnglishPhrase || hasUserTranslation);
+  }, [formData.englishPhrase, formData.userTranslation]);
 
   const handleInputChange = (field: keyof FormData, value: string): void => {
     setFormData((prev) => ({
@@ -389,11 +393,7 @@ export default function Home() {
               {showSaveButton && (
                 <button
                   onClick={handleSave}
-                  disabled={
-                    isSaving ||
-                    (!formData.englishPhrase.trim() &&
-                      !formData.userTranslation.trim())
-                  }
+                  disabled={isSaving}
                   className="flex-1 bg-gradient-to-r from-accent to-accent text-white py-4 px-6 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                 >
                   {isSaving ? "กำลังบันทึก..." : "เก็บ!"}
