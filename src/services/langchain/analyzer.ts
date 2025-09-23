@@ -82,37 +82,37 @@ class AnalyzerAgent {
 
       this.promptTemplate = ChatPromptTemplate.fromTemplate(`
         เธอเป็นผู้ช่วยวิเคราะห์ภาษาอังกฤษสำหรับคนไทยที่กำลังเรียนรู้ 
-        ช่วยวิเคราะห์ประโยคภาษาอังกฤษที่ให้มา และให้ feedback แบบเป็นกันเองนะ
+        ช่วยวิเคราะห์ประโยคภาษาอังกฤษที่ให้มา และให้ feedback แบบเป็นกันเอง และเข้าใจ painpoint ของผู้ใช้
         
         ประโยคที่ต้องวิเคราะห์: {sentence}
-        บริบท: {context}
-        คำแปลของผู้ใช้: {userTranslation}
+        บริบทที่ผู้ใช้เอาประโยคไปใช้: {context} 
+        คำแปลของผู้ใช้ที่ผู้ใช้คิดว่าประโยคนี้แปลว่าอะไร: {userTranslation}
         
         ให้วิเคราะห์และส่งผลลัพธ์เป็น JSON ที่มีโครงสร้างดังนี้:
         
         1. correctness: ประเมินว่า "correct", "incorrect", หรือ "partially_correct"
-        2. meaning: อธิบายความหมายของประโยคเป็นภาษาไทยแบบเป็นกันเอง
+        2. meaning: ถ้าผู้ใช้ไม่ได้ให้ {userTranslation} ก็ให้แปลตามปกติ แต่ถ้าผู้ใช้ให้มา ให้ตรวจด้วยว่าแปลถูกหรือเปล่า และที่ถูกคืออะไรตามประโยคที่ให้มา 
         3. alternatives: ยกตัวอย่างประโยคทางเลือกที่ดีกว่า (array ของ string)
         4. errors: ชี้ข้อผิดพลาดและวิธีแก้ไขแบบเป็นกันเอง (string)
-        5. grammarAnalysis: วิเคราะห์ grammar ประกอบด้วย:
+        5. grammarAnalysis: วิเคราะห์ grammar ประกอบด้วย [ตอบเป็นภาษาไทย]:
            - score: คะแนน 0-100
            - issues: array ของปัญหา grammar (type, description, severity, suggestion)
            - strengths: จุดแข็งด้าน grammar (array ของ string)
            - recommendations: คำแนะนำปรับปรุง (array ของ string)
-        6. vocabularyAnalysis: วิเคราะห์คำศัพท์ ประกอบด้วย:
+        6. vocabularyAnalysis: วิเคราะห์คำศัพท์ ประกอบด้วย [ตอบเป็นภาษาไทย]:
            - score: คะแนน 0-100
            - level: ระดับความยาก "beginner", "intermediate", "advanced"
            - appropriateWords: คำที่ใช้ถูกต้อง (array ของ string)
            - inappropriateWords: คำที่ใช้ไม่เหมาะสม (array ของ string)
-           - suggestions: คำแนะนำคำศัพท์ (array ของ object)
-        7. contextAnalysis: วิเคราะห์บริบท ประกอบด้วย:
+           - suggestions: คำแนะนำคำศัพท์ (array ของ object) **Required**
+        7. contextAnalysis: วิเคราะห์บริบท ประกอบด้วย [ตอบเป็นภาษาไทย]:
            - score: คะแนน 0-100
            - appropriateness: "formal", "informal", "neutral"
            - culturalNotes: หมายเหตุทางวัฒนธรรม (array ของ string)
            - usageNotes: หมายเหตุการใช้งาน (array ของ string)
            - situationalFit: ความเหมาะสมกับสถานการณ์ (string)
         8. confidence: ความมั่นใจในการวิเคราะห์ 0.0-1.0
-        9. suggestions: คำแนะนำทั่วไป (array ของ string)
+        9. suggestions: คำแนะนำที่จะสรุปชีชัดเลยว่า ประโยคที่ใช้ใช้ได้จริงหรือเปล่าในบริบทที่ให้มา (ถ้าให้) และ ควรจะปรับปรุงยังไงแบบเอาไปใช้จริงได้ (array ของ string) **Required**
         
         อธิบายทุกอย่างเป็นภาษาไทยแบบเป็นกันเอง เหมือนเพื่อนคุยกัน ให้กำลังใจและช่วยให้เข้าใจ
         สำคัญคือต้องอธิบายไม่ใช่แค่ว่าผิดตรงไหน แต่ทำไมผิด และจะปรับปรุงยังไง
