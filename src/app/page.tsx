@@ -11,6 +11,15 @@ import {
   ERROR_MESSAGES, 
   ErrorType 
 } from "@/interfaces/langchain";
+import {
+  transformPhoneticToThai,
+  transformDifficultyToThai,
+  transformVocabularyLevelToThai,
+  transformComplexityToThai,
+  transformAppropriatenessToThai,
+  getEncouragingTone,
+  getStarRatingMessage
+} from "@/lib/ui-transformations";
 
 interface FormData {
   englishPhrase: string;
@@ -437,6 +446,9 @@ export default function Home() {
                 <div className="text-center border-b pb-4">
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">ผลการวิเคราะห์</h2>
                   <StarRating rating={analysisResult.overallStarRating || 3} label="คะแนนรวม" />
+                  <p className="text-sm text-gray-600 mt-2">
+                    {getStarRatingMessage(analysisResult.overallStarRating || 3)}
+                  </p>
                 </div>
 
                 {/* Basic Analysis */}
@@ -456,6 +468,11 @@ export default function Home() {
                       {analysisResult.correctness === "incorrect" && "❌ ไม่ถูกต้อง"}
                     </span>
                   </div>
+                  <div className="mb-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                    <p className="text-blue-800 font-medium text-sm">
+                      {getEncouragingTone(analysisResult.correctness).icon} {getEncouragingTone(analysisResult.correctness).message}
+                    </p>
+                  </div>
                   <p className="text-gray-700 mb-2">
                     <strong>ความหมาย:</strong> {analysisResult.meaning}
                   </p>
@@ -473,7 +490,7 @@ export default function Home() {
                   <p className="text-sm text-gray-600 mb-3">
                     คะแนน: <span className="font-medium">{analysisResult.grammarAnalysis.score}/100</span>
                     {" | "}
-                    ความซับซ้อน: <span className="font-medium">{analysisResult.grammarAnalysis.complexity}</span>
+                    ความซับซ้อน: <span className="font-medium">{transformComplexityToThai(analysisResult.grammarAnalysis.complexity)}</span>
                   </p>
 
                   {/* Tense Analysis */}
@@ -602,9 +619,9 @@ export default function Home() {
                   <p className="text-sm text-gray-600 mb-3">
                     คะแนน: <span className="font-medium">{analysisResult.vocabularyAnalysis.score}/100</span>
                     {" | "}
-                    ระดับ: <span className="font-medium">{analysisResult.vocabularyAnalysis.level}</span>
+                    ระดับ: <span className="font-medium">{transformVocabularyLevelToThai(analysisResult.vocabularyAnalysis.level)}</span>
                     {" | "}
-                    ความยาก: <span className="font-medium">{analysisResult.vocabularyAnalysis.overallDifficulty}</span>
+                    ความยาก: <span className="font-medium">{transformDifficultyToThai(analysisResult.vocabularyAnalysis.overallDifficulty)}</span>
                   </p>
 
                   {/* Word Breakdown */}
@@ -623,17 +640,13 @@ export default function Home() {
                                 <strong>ชนิดคำ:</strong> {word.partOfSpeech}
                               </div>
                               <div>
-                                <strong>ความยาก:</strong> {word.difficulty}
+                                <strong>ความยาก:</strong> <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">{transformDifficultyToThai(word.difficulty)}</span>
                               </div>
                             </div>
                             {word.phonics && (
-                              <div className="mt-2 p-2 bg-gray-50 rounded">
+                              <div className="mt-2 p-2 bg-blue-50 rounded">
                                 <div className="text-sm">
-                                  <strong>การออกเสียง:</strong> {word.phonics.pronunciation}
-                                </div>
-                                <div className="text-sm">
-                                  <strong>พยางค์:</strong> {word.phonics.syllables} | 
-                                  <strong> เน้นเสียง:</strong> {word.phonics.stress}
+                                  <strong>การออกเสียง:</strong> <span className="font-mono text-blue-700">{transformPhoneticToThai(word.phonics.pronunciation, word.phonics.syllables, word.phonics.stress)}</span>
                                 </div>
                               </div>
                             )}
@@ -682,7 +695,7 @@ export default function Home() {
                   <p className="text-sm text-gray-600 mb-3">
                     คะแนน: <span className="font-medium">{analysisResult.contextAnalysis.score}/100</span>
                     {" | "}
-                    ความเหมาะสม: <span className="font-medium">{analysisResult.contextAnalysis.appropriateness}</span>
+                    ความเหมาะสม: <span className="font-medium">{transformAppropriatenessToThai(analysisResult.contextAnalysis.appropriateness)}</span>
                   </p>
                   <p className="text-sm text-gray-700 mb-3">{analysisResult.contextAnalysis.situationalFit}</p>
 
